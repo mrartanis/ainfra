@@ -151,8 +151,10 @@ func (s *Service) reassess(tx Tx, n domain.Node) error {
 	}
 	seen := map[string]bool{}
 	sources := map[string]bool{}
+	packagesBySource := map[string][]domain.Package{}
 	for _, p := range data.Packages {
 		sources[p.Source] = true
+		packagesBySource[p.Source] = append(packagesBySource[p.Source], p)
 	}
 	for _, feed := range feeds {
 		var ads []domain.Advisory
@@ -164,12 +166,7 @@ func (s *Service) reassess(tx Tx, n domain.Node) error {
 				continue
 			}
 			key := hash([]string{n.ID, a.Source, a.ID, a.Channel})
-			group := []domain.Package{}
-			for _, p := range data.Packages {
-				if p.Source == a.Source {
-					group = append(group, p)
-				}
-			}
+			group := packagesBySource[a.Source]
 			if len(group) == 0 {
 				continue
 			}

@@ -1,0 +1,20 @@
+bash:
+  Installed: 5.1-6ubuntu1.1
+  Candidate: 5.1-6ubuntu1.1
+  Version table:
+ *** 5.1-6ubuntu1.1 500
+        500 http://mirror.yandex.ru/ubuntu jammy-updates/main amd64 Packages
+        500 http://mirror.yandex.ru/ubuntu jammy-security/main amd64 Packages
+        100 /var/lib/dpkg/status
+     5.1-6ubuntu1 500
+        500 http://mirror.yandex.ru/ubuntu jammy/main amd64 Packages
+openssl:
+  Installed: 3.0.2-0ubuntu1.30
+  Candidate: 3.0.2-0ubuntu1.30
+  Version table:
+ *** 3.0.2-0ubuntu1.30 500
+        500 http://mirror.yandex.ru/ubuntu jammy-updates/main amd64 Packages
+        500 http://mirror.yandex.ru/ubuntu jammy-security/main amd64 Packages
+        100 /var/lib/dpkg/status
+     3.0.2-0ubuntu1 500
+        500 http://mirror.yandex.ru/ubuntu jammy/main amd64 Packages

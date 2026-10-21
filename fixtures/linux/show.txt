@@ -1,0 +1,76 @@
+Package: bash
+Priority: required
+Section: shells
+Installed-Size: 1864
+Maintainer: Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>
+Architecture: amd64
+Version: 5.1-6ubuntu1.1
+Recommends: bash-completion (>= 20060301-0)
+Replaces: bash-completion (<< 20060301-0), bash-doc (<= 2.05-1)
+Suggests: bash-doc
+Depends: base-files (>= 2.1.12), debianutils (>= 2.15)
+Conflicts: bash-completion (<< 20060301-0)
+Pre-Depends: libc6 (>= 2.34), libtinfo6 (>= 6)
+Essential: yes
+Filename: pool/main/b/bash/bash_5.1-6ubuntu1.1_amd64.deb
+Size: 768646
+MD5sum: 839255d7d981045fa5d2ae75aec96185
+SHA1: 429c43bad88f1efe895e3ee581a0cbb913a44b41
+SHA256: ada09ec56baa774af85b01ab8aad32f10ce82aeccbd2889110db318d46e26914
+SHA512: 4f3b4481a27fb7d76aabf58a4bb7571363886739cccbf4fa4b8b4a3f7aabb84fc608bb02194fd1f892e213d4650c89455626688b5e58969eb5e6ae9c7dfa9c54
+Homepage: http://tiswww.case.edu/php/chet/bash/bashtop.html
+Description-en: GNU Bourne Again SHell
+ Bash is an sh-compatible command language interpreter that executes
+ commands read from the standard input or from a file.  Bash also
+ incorporates useful features from the Korn and C shells (ksh and csh).
+ .
+ Bash is ultimately intended to be a conformant implementation of the
+ IEEE POSIX Shell and Tools specification (IEEE Working Group 1003.2).
+ .
+ The Programmable Completion Code, by Ian Macdonald, is now found in
+ the bash-completion package.
+Description-md5: 3522aa7b4374048d6450e348a5bb45d9
+Multi-Arch: foreign
+Original-Maintainer: Matthias Klose <doko@debian.org>
+Origin: Ubuntu
+Bugs: https://bugs.launchpad.net/ubuntu/+filebug
+Task: minimal
+
+Package: bash
+Architecture: amd64
+Version: 5.1-6ubuntu1
+Multi-Arch: foreign
+Priority: required
+Essential: yes
+Section: shells
+Origin: Ubuntu
+Maintainer: Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>
+Original-Maintainer: Matthias Klose <doko@debian.org>
+Bugs: https://bugs.launchpad.net/ubuntu/+filebug
+Installed-Size: 1864
+Pre-Depends: libc6 (>= 2.34), libtinfo6 (>= 6)
+Depends: base-files (>= 2.1.12), debianutils (>= 2.15)
+Recommends: bash-completion (>= 20060301-0)
+Suggests: bash-doc
+Conflicts: bash-completion (<< 20060301-0)
+Replaces: bash-completion (<< 20060301-0), bash-doc (<= 2.05-1)
+Filename: pool/main/b/bash/bash_5.1-6ubuntu1_amd64.deb
+Size: 768660
+MD5sum: 11adc5970b295d29ff2a206bcef6224f
+SHA1: 69b0696ad1f101d2ec4c599c279e9524c4b744c9
+SHA256: 543fc0be88d2cf33ada88fe0cf82e1ec3fdcdd56e411dd2958eb3ef6e1a3d2fa
+SHA512: 89af38fe631eb29e89b8659aca7fa2b26e4a88c907ee1b759f336cc8e0a6d56562380651f210b1ed480bd727d21dfb9b9de9e839310cecdc619d7362cac607b4
+Homepage: http://tiswww.case.edu/php/chet/bash/bashtop.html
+Description-en: GNU Bourne Again SHell
+ Bash is an sh-compatible command language interpreter that executes
+ commands read from the standard input or from a file.  Bash also
+ incorporates useful features from the Korn and C shells (ksh and csh).
+ .
+ Bash is ultimately intended to be a conformant implementation of the
+ IEEE POSIX Shell and Tools specification (IEEE Working Group 1003.2).
+ .
+ The Programmable Completion Code, by Ian Macdonald, is now found in
+ the bash-completion package.
+Description-md5: 3522aa7b4374048d6450e348a5bb45d9
+Task: minimal
+
