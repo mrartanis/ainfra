@@ -56,3 +56,40 @@ func TestEvidenceReadFailurePreventsDraftAndApproval(t *testing.T) {
 		t.Fatalf("read ignored unavailable evidence: %v", err)
 	}
 }
+
+func TestPlanRevalidationTracksVersionsNotRefreshHeartbeat(t *testing.T) {
+	ctx := context.Background()
+	now := time.Now().UTC()
+	svc := app.New(testkit.NewStore(), func() time.Time { return now }, testkit.IDs())
+	admin := domain.Principal{Role: "admin", ID: "human"}
+	editor := domain.Principal{Role: "editor", ID: "editor"}
+	n, err := svc.SaveNode(ctx, admin, domain.Node{Name: "host"}, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	principal := domain.Principal{Role: "agent", Instance: "agent", Nodes: []string{n.ID}}
+	report := func(sequence uint64, version string) {
+		data, _ := json.Marshal(domain.PackageData{Packages: []domain.Package{{Name: "foo", Version: version, Source: "foo", SourceVersion: version}}, MetadataRefresh: &domain.APTRefresh{LastAttempt: now, LastSuccess: now, Status: "success"}})
+		_, err := svc.IngestReport(ctx, principal, domain.Report{SchemaVersion: 1, ID: now.String(), NodeID: n.ID, Instance: "agent", Sequence: sequence, ObservedAt: now, Collectors: map[string]domain.Section{"packages": {Status: "ok", Complete: true, ObservedAt: now, Data: data}}})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	report(1, "1")
+	plan, err := svc.EditDocument(ctx, editor, domain.Document{Title: "Plan", Kind: "maintenance_plan", Body: "Check version", Nodes: []string{n.ID}}, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now = now.Add(time.Hour)
+	report(2, "1")
+	read, err := svc.Document(ctx, admin, plan.ID, 0)
+	if err != nil || read.NeedsRevalidation {
+		t.Fatal("heartbeat invalidated unchanged packages", read.NeedsRevalidation, err)
+	}
+	now = now.Add(time.Hour)
+	report(3, "2")
+	read, err = svc.Document(ctx, admin, plan.ID, 0)
+	if err != nil || !read.NeedsRevalidation {
+		t.Fatal("changed package did not invalidate plan", err)
+	}
+}

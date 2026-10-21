@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 )
 
 func (s *Service) EditDocument(ctx context.Context, p domain.Principal, d domain.Document, revision int) (out domain.Document, err error) {
@@ -67,7 +68,26 @@ func evidence(tx Tx, nodes []string) (string, error) {
 		if e := tx.Get("node", id, &n); e != nil {
 			return "", e
 		}
-		v[id] = n.Observations["packages"].Data
+		var packages domain.PackageData
+		if raw := n.Observations["packages"].Data; len(raw) > 0 {
+			if err := json.Unmarshal(raw, &packages); err != nil {
+				return "", err
+			}
+		}
+		sort.Slice(packages.Packages, func(i, j int) bool {
+			a, b := packages.Packages[i], packages.Packages[j]
+			if a.Name != b.Name {
+				return a.Name < b.Name
+			}
+			return a.Arch < b.Arch
+		})
+		var os domain.OSData
+		if raw := n.Observations["os"].Data; len(raw) > 0 {
+			if err := json.Unmarshal(raw, &os); err != nil {
+				return "", err
+			}
+		}
+		v[id] = map[string]any{"packages": packages.Packages, "os": []string{os.ID, os.Version, os.Codename, os.Arch}}
 	}
 	docs, e := decodeList[domain.Document](tx, "document")
 	if e != nil {

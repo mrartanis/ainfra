@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "check_id": "hosting-invoice",
+  "kind": "payment",
+  "observed_at": "2026-10-21T12:00:00Z",
+  "status": "ok",
+  "data": {
+    "next_due_date": "2026-11-01T00:00:00Z",
+    "currency": "EUR",
+    "amount": "12.50",
+    "evidence": "EXAMPLE ONLY: replace from your local invoice record; no provider API call"
+  }
+}
