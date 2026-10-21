@@ -1,6 +1,6 @@
 # Приёмка
 
-Состояние: разработка продолжается, весь DoD ещё не закрыт. Уточнения владельца имеют приоритет: отдельный UI/API, только proxy TLS, best-effort без spool, ограничение хранения на сервере.
+Состояние: реализация и локальная приёмка завершены; результаты и границы перечислены ниже. Внешнее развёртывание не входит в текущую приёмку. Уточнения владельца имеют приоритет: отдельный UI/API, только proxy TLS, best-effort без spool, ограничение хранения на сервере.
 
 | Область | Проверенная часть | Доказательство / оставшееся |
 |---|---|---|
@@ -29,7 +29,40 @@
 
 2026-10-21, код 7e76fd9. Полная race suite, govulncheck v1.9.0 (No vulnerabilities found), release checks, archive smoke amd64 + arm64/QEMU, collector matrix и расширенный Playwright smoke прошли повторно. Сервер и отдельный UI перезапущены на 127.0.0.1:18080/18081. Агент: sequence 4, 2863 пакета, OS/packages/network ok; WireGuard error отражён честно. Debian: 271108 advisory, Ubuntu: 1513587; нормализация версии 1 и фактические releases видны в feed-status. Политика retention через API: 90 дней / 100000 events и receipts / 20 ревизий / 1024 MiB. На старте очищается история; открытые findings и актуальный инвентарь сохраняются.
 
-Указанные ранее пробелы закрыты: timestamps/idempotency ручных связей, tags документов в форме/preview, labels/links и отдельные наблюдения оплаты. Общий контракт fake/SQLite и шесть коротких fuzz-прогонов проходят; полная матрица пяти дистрибутивов выполнена на amd64 и arm64/QEMU, нативный ARM64 CI job также прошёл. Полный аудит ТЗ ещё не закрыт: проверить эксплуатационные требования structured logs, content hashes секций и соответствие названий CLI-команд, затем окончательную комплектность передачи. Внешняя установка, живой RouterOS и привилегированные helper units не запускались; пользователь просил пока локальную приёмку.
+Указанные ранее пробелы закрыты: timestamps/idempotency ручных связей, tags документов в форме/preview, labels/links и отдельные наблюдения оплаты. Общий контракт fake/SQLite и шесть коротких fuzz-прогонов проходят; полная матрица пяти дистрибутивов выполнена на amd64 и arm64/QEMU, нативный ARM64 CI job также прошёл. Эксплуатационные требования structured logs, content hashes секций и help/check агента реализованы и покрыты регрессионными тестами; итоговое соответствие этапам приведено ниже. Внешняя установка, живой RouterOS и привилегированные helper units не запускались; пользователь просил пока локальную приёмку.
 
 
 Дополнение 2026-10-21 20:05 UTC: локальный агент отправил sequence 5, OS/packages/network/disks ok, 9 наблюдений локальных дисков; WG error сохраняется без подмены успехом. Playwright подтвердил labels/links, tags, ручную оплату с calendar clamp и редактирование даты без потери LastPaid/note/timezone. Архивы с backend 2516772 прошли amd64/arm64 smoke с пустым `/usr/share/zoneinfo`, включая Europe/Berlin и restore; исправление aria-label textarea проверено последующим локальным browser smoke и должно войти в окончательную пересборку архивов.
+
+
+## Итоговый аудит этапов ТЗ (локальный контур)
+
+Проверен код ed2a0ff. Уточнения владельца заменяют исходные пункты про embedded UI, TLS на сервере и spool: UI — отдельный процесс, сервер — HTTP за proxy, доставка — три попытки и discard. Счётчик sequence на диске предотвращает откат наблюдений после перезапуска, он не является гарантией доставки.
+
+| Этап ТЗ | Результат и подтверждение |
+|---|---|
+| 0: основа/дистрибуция | Четыре бинарника, ручной DI в cmd, static Linux amd64/arm64, macOS arm64 CLI; release-check проверяет ELF и комплектность. Threat model в security.md. |
+| 1: домен/persistence/auth | Общая contract suite fake + SQLite; тесты scopes/rotation/revoke, order/replay, partial snapshots, transaction rollback, reopen и migrations. |
+| 2: инвентарь/UI | Реальный browser smoke: четыре типа узлов, двусторонние связи, shared document/tags, labels/links, service/backup CRUD, payment/calendar/edit, Markdown preview, поиск и mobile. |
+| 3: Linux/APT | Реальный локальный Ubuntu host и десять distro/architecture комбинаций; parser fixtures для hold/pinning/multiarch/source/broken/unknown. Retry/discard проверен отдельным тестом. |
+| 4: checks/WG/RouterOS | Typed checks, allowlist/process timeout, last-good, restore evidence и предложения связей проверены. RouterOS — HTTPS protocol tests; живого устройства нет. WG на локальном host сообщает ошибку прав/доступности, успех не выдумывается. |
+| 5: CVE | Оба настоящих feed импортированы; offline matching/ranges/release/Pro/unknown tests, comparator против dpkg, reassessment/lifecycle/suppression. Одна фактическая находка дополнительно сверена с Canonical и host dpkg; приватное доказательство в .local/vendor-verification.json. |
+| 6: CLI/skill/plans | API-only CLI, JSON/schema/export/context; reader/editor/admin walkthrough из release archive, draft/approval/evidence invalidation/complete/cancel. Модель и её credentials не нужны. |
+| 7: эксплуатация | Retention age/count/revisions/size, rollback при заполнении, активный backup/restore, schema upgrade, race/fuzz/security, нагрузка на 2 CPU/2 GiB и install/uninstall. Structured JSON logs и correlation ID проверены без утечки содержимого запросов. |
+| 8: приёмка владельца | Выполнена локальная часть: настоящий агент, API/UI/CLI, vendor comparison, документы/планы, backup/restore. Внешняя установка, reboot/timer и privileged helpers намеренно не запускались. |
+
+Секции инвентаря имеют независимые content hashes и last-good timestamps. SQLite хранит текущий JSON-агрегат узла, а не отдельную историческую таблицу package snapshots: неизменные полные списки не накапливаются. Пересчёт findings синхронный в атомарной транзакции; отдельная очередь pending jobs не нужна. Эти решения сохраняют проверяемость состояния при рестарте и ограничивают хранение.
+
+Комплект передачи: README, operations/security/data-model/provider-contract/acceptance/progress, ADR, OpenAPI/JSON Schemas, fixtures с provenance, skills/infra-review, systemd/config/examples, install/uninstall и dist archives с SHA256SUMS/licenses. Исходный план сохранён без переписывания его требований задним числом.
+
+Не проверено live: RouterOS; установка systemd/timer и reboot; opt-in root APT refresh и WireGuard helper; runtime macOS CLI; внешний TLS proxy/сервер владельца. QEMU не выдаётся за native ARM64: локальная полная матрица эмулирована, отдельный native ARM64 CI job также прошёл.
+
+## Доступ к локальному экземпляру
+
+UI: http://127.0.0.1:18081; API: http://127.0.0.1:18080. Admin token хранится в .local/admin.token (0600), вводится в login, не публикуется. Реальный узел: local-ubuntu, UUID c41259fb-7128-4e51-bdba-a4d805687858; browser-* — явно помеченные тестовые записи. Server запущен с --feeds=false для воспроизводимой локальной проверки и использует ранее импортированный кэш; автоматический refresh включается обычным запуском без этого флага.
+
+Последний реальный отчёт: sequence 6, OS/packages/network/disks ok; 2863 пакета. Content hashes четырёх успешных секций имеют 64 hex символа, JSON request logs проверены на работающем API. Retention API подтвердил 90 дней / 100000 / 20 / 1024 MiB, файл БД 676331520 байт на момент проверки. Browser smoke повторно прошёл на этом коде.
+
+GitHub CI для ed2a0ff завершён успешно: [run 39669318162](https://github.com/mrartanis/ainfra/actions/runs/39669318162), test (включая govulncheck/fuzz), race, release-build и native ARM64 collectors.
+
+Финальная проверка ed2a0ff: `make test lint fmt-check`, полная `make test-race`, `make release release-check` прошли. Свежие архивы прошли оба `scripts/release-smoke.py --arch amd64/arm64`: non-root/offline install, настоящий агент, restart, активный backup/restore, auth, role-scoped skill walkthrough, поиск/export и uninstall с сохранением state. Linux ARM64 archive smoke локально использует QEMU. Архивы находятся в dist/, SHA256SUMS проверены.

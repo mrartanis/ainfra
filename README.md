@@ -48,6 +48,6 @@ make test-race test-fuzz
 make build release release-check
 ```
 
-[Приёмка](docs/acceptance.md) отличает выполненные проверки от оставшихся. До закрытия приёмки репозиторий является разрабатываемым продуктом, а не завершённым релизом.
+[Локальная приёмка](docs/acceptance.md) содержит проверенные сценарии и ограничения: живой RouterOS, внешний deployment и привилегированные helper units не запускались. Готовые архивы создаются в `dist/`, установка и восстановление описаны в [эксплуатации](docs/operations.md).
 
 [Эксплуатация](docs/operations.md), [безопасность](docs/security.md), [модель](docs/data-model.md), [контракт providers](docs/provider-contract.md), [ход работ](docs/progress.md).

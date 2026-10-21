@@ -1,5 +1,7 @@
 # Прогресс
 
+Ниже хронология: промежуточные «pending/не завершено» относятся к своему checkpoint. Актуальный итог — в конце файла и [приёмке](acceptance.md).
+
 Начало: пустой репозиторий, изучено ТЗ. Подготовлен план и ADR. Разработка идёт локально; исходные файлы владельца сохранены.
 
 ## Core / persistence
@@ -105,3 +107,10 @@ Current processes: API PID 470580 (2516772 backend) at 127.0.0.1:18080; UI PID 4
 Operational audit: server now emits structured JSON lifecycle/request logs with injected slog adapter; TDD proves response/log request-ID correlation and absence of path/query/body/Authorization/client-supplied IDs. Observation sections receive server-computed canonical SHA-256 independent of envelope/freshness and preserving large integers; TDD covers formatting/key order, timestamp changes and real content changes. Agent help works without config; explicit `check` alias maps to schema/config validation, without reading credentials. Full test/lint/fmt/build passed.
 
 An actual local package finding was independently checked against its Canonical CVE page and host dpkg version comparison. The service's affected + fix-published-not-candidate result matched the vendor's Pro fix; no update was performed and runtime exploitability is not claimed. Detailed host-specific evidence is kept privately in ignored .local/vendor-verification.json, not published with source code.
+
+
+## Итог локальной приёмки, 2026-10-21
+
+Реализация в оговорённом локальном контуре завершена. Проверенный код ed2a0ff: full test/lint/fmt/race, static release + checksums, свежие amd64 и arm64/QEMU install/agent/restart/backup/restore/auth/skill/export/uninstall smokes и browser smoke прошли. CI run 39669318162 завершён success по всем четырём jobs, включая native ARM64 collectors и dependency/fuzz checks.
+
+API PID 518278 на 127.0.0.1:18080, UI PID 518286 на 127.0.0.1:18081; реальный local-ubuntu report sequence 6, 2863 пакета, OS/packages/network/disks ok. Политика хранения подтверждена API, structured logs и section hashes — на работающем сервере. Полный итоговый аудит этапов и комплект передачи в docs/acceptance.md; исторические pending выше закрыты этим checkpoint. Внешний deployment/живой RouterOS/systemd reboot/privileged helpers/macOS runtime остаются явно непроверенными и не заявляются частью выполненной локальной приёмки.
