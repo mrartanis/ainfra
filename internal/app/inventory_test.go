@@ -54,3 +54,13 @@ func TestDuplicateRelationPreservesCreationTimeAndAudit(t *testing.T) {
 		t.Fatal("retry changed relation or audit", repeated, r, len(before), len(after))
 	}
 }
+
+func TestInvalidPaymentScheduleIsRejectedBeforeSaving(t *testing.T) {
+	svc := app.New(testkit.NewStore(), time.Now, testkit.IDs())
+	admin := domain.Principal{Role: "admin"}
+	for _, payment := range []domain.Payment{{NextDue: time.Now(), Interval: 0, Unit: "months", Timezone: "UTC"}, {NextDue: time.Now(), Interval: 1, Unit: "minutes", Timezone: "UTC"}, {NextDue: time.Now(), Interval: 1, Unit: "months", Timezone: "Not/AZone"}, {Interval: 1, Unit: "months", Timezone: "UTC"}} {
+		if _, err := svc.SaveNode(context.Background(), admin, domain.Node{Name: "bad schedule", Payment: &payment}, 0); err != app.ErrInvalid {
+			t.Fatal("invalid schedule saved", payment, err)
+		}
+	}
+}

@@ -147,6 +147,11 @@ func (s *Service) SaveNode(ctx context.Context, p domain.Principal, n domain.Nod
 	if strings.TrimSpace(n.Name) == "" || len(n.Name) > 200 {
 		return out, ErrInvalid
 	}
+	if n.Payment != nil {
+		if _, e := NextDue(*n.Payment); e != nil {
+			return out, e
+		}
+	}
 	if len(n.WireGuardPublicKeys) > 32 {
 		return out, ErrInvalid
 	}

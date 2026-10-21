@@ -92,3 +92,27 @@ func TestNodeMetadataEditPreservesOtherLabels(t *testing.T) {
 		t.Fatal(labels, links)
 	}
 }
+
+func TestPaymentDateEditPreservesPaidHistoryAndTimezone(t *testing.T) {
+	var saved map[string]any
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "GET" {
+			w.Write([]byte(`{"id":"node","payment":{"next_due":"2026-10-01T00:00:00+02:00","interval":1,"unit":"months","timezone":"Europe/Berlin","last_paid":"2026-09-01T12:00:00Z","note":"keep note","amount":"10","currency":"EUR"}}`))
+			return
+		}
+		json.NewDecoder(r.Body).Decode(&saved)
+		w.Write([]byte(`{"id":"node"}`))
+	}))
+	defer api.Close()
+	u := New(api.URL, api.Client(), false, time.Now)
+	c := &apiclient.Client{Base: api.URL, HTTP: api.Client()}
+	r := httptest.NewRequest("POST", "/nodes/save", nil)
+	r.Form = url.Values{"id": {"node"}, "revision": {"3"}, "name": {"host"}, "next_due": {"2026-11-01"}, "payment_interval": {"1"}, "payment_unit": {"months"}}
+	if _, err := u.mutate(r.Context(), c, r, map[string]any{}); err != nil {
+		t.Fatal(err)
+	}
+	p := saved["payment"].(map[string]any)
+	if p["last_paid"] != "2026-09-01T12:00:00Z" || p["note"] != "keep note" || p["amount"] != "10" || p["currency"] != "EUR" || p["timezone"] != "Europe/Berlin" || p["next_due"] != "2026-11-01T00:00:00+01:00" {
+		t.Fatal(p)
+	}
+}

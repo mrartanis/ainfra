@@ -60,6 +60,16 @@ with tempfile.TemporaryDirectory(prefix='infra-release-') as directory:
         execute('/tmp/install/bin/infra-agent', 'run', '--config', '/config/agent.json')
         observed = json.loads(cli('nodes', 'show', node['id']).stdout)
         assert observed['sequence'] == 1 and observed['observations']['packages']['data']['packages']
+        # Non-UTC recurrence must work even in the minimal image without tzdata.
+        observed['payment'] = {'next_due': '2026-03-31T10:00:00+02:00', 'interval': 1,
+                               'unit': 'months', 'timezone': 'Europe/Berlin', 'note': 'calendar smoke'}
+        write('payment-node.json', observed)
+        scheduled = json.loads(cli('nodes', 'put', '--file', '/config/payment-node.json',
+                                   '--if-revision', str(observed['revision'])).stdout)
+        paid = json.loads(cli('request', 'POST', 'nodes/' + node['id'] + '/pay',
+                              '--if-revision', str(scheduled['revision'])).stdout)
+        assert paid['payment']['next_due'] == '2026-04-30T10:00:00+02:00'
+        assert not paid['payment']['last_paid'].startswith('0001-')
         write('doc.json', {'title': 'Archive restore evidence', 'kind': 'runbook', 'body': 'Unique archive smoke phrase', 'nodes': [node['id']]})
         doc = json.loads(cli('docs', 'put', '--file', '/config/doc.json').stdout)
         # Walk through the shipped skill using actual binaries and role-scoped tokens.

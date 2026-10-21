@@ -104,9 +104,24 @@ with sync_playwright() as p:
         assert link.count() == 1 and url + link.get_attribute('href') == document_url
     page.goto(url + '/nodes/' + nodes['vm'] + '?edit=true')
     page.get_by_label('Назначение', exact=True).fill(prefix + ' edited purpose')
+    page.get_by_label('Следующая дата', exact=True).fill('2026-10-31')
+    page.get_by_label('Часовой пояс', exact=True).fill('Europe/Berlin')
+    page.get_by_label('Сумма', exact=True).fill('10')
+    page.get_by_label('Валюта', exact=True).fill('EUR')
+    page.get_by_label('Примечание к оплате', exact=True).fill('payment fixture note')
     page.get_by_role('button', name='Сохранить', exact=True).click()
     page.reload()
     assert page.get_by_text(prefix + ' edited purpose', exact=False).count() > 0
+    page.get_by_text('Бэкапы и оплата', exact=True).click()
+    page.get_by_role('button', name='Оплатил', exact=True).click()
+    page.goto(url + '/nodes/' + nodes['vm'] + '?edit=true')
+    assert page.get_by_label('Следующая дата', exact=True).input_value() == '2026-11-30'
+    assert page.get_by_label('Часовой пояс', exact=True).input_value() == 'Europe/Berlin'
+    assert page.get_by_label('Примечание к оплате', exact=True).input_value() == 'payment fixture note'
+    page.get_by_label('Следующая дата', exact=True).fill('2026-12-31')
+    page.get_by_role('button', name='Сохранить', exact=True).click()
+    page.get_by_text('Бэкапы и оплата', exact=True).click()
+    assert 'неизвестно' not in page.get_by_text('Последняя отметка «Оплатил»:', exact=False).inner_text()
     page.goto(url + '/search?q=' + prefix)
     assert page.get_by_role('link', name=prefix + ' shared runbook').count() == 1
     page.goto(url + '/')
@@ -131,4 +146,4 @@ with sync_playwright() as p:
     page.goto(url + '/settings')
     assert page.get_by_role('heading', name='Хранение', exact=True).is_visible()
     browser.close()
-print('Browser smoke passed: login, four node types, edit/reload, bidirectional relations and deletion, service/backup editing and deletion, shared document, Markdown preview, search, escaping, mobile widths, settings')
+print('Browser smoke passed: login, four node types, edit/reload, bidirectional relations and deletion, service/backup editing and deletion, shared document/tags, labels/links, calendar payment/edit, Markdown preview, search, escaping, mobile widths, settings')

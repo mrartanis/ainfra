@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	_ "time/tzdata"
 	"unicode/utf8"
 )
 
@@ -100,7 +101,7 @@ func (s *Service) DeleteRelation(ctx context.Context, p domain.Principal, id str
 }
 func NextDue(p domain.Payment) (time.Time, error) {
 	loc, e := time.LoadLocation(p.Timezone)
-	if e != nil || p.Interval < 1 || p.Interval > 120 {
+	if e != nil || p.NextDue.IsZero() || p.Interval < 1 || p.Interval > 120 {
 		return time.Time{}, ErrInvalid
 	}
 	d := p.NextDue.In(loc)

@@ -21,6 +21,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	_ "time/tzdata"
 )
 
 //go:embed templates/*
@@ -46,7 +47,13 @@ type UI struct {
 }
 
 func New(base string, client *http.Client, dev bool, now func() time.Time) *UI {
-	funcs := template.FuncMap{"pairs": func(v any) string {
+	funcs := template.FuncMap{"date": func(v any) string {
+		s, _ := v.(string)
+		if len(s) >= 10 && !strings.HasPrefix(s, "0001-") {
+			return s[:10]
+		}
+		return ""
+	}, "pairs": func(v any) string {
 		m, _ := v.(map[string]any)
 		keys := make([]string, 0, len(m))
 		for k := range m {
@@ -426,13 +433,48 @@ func (u *UI) mutate(ctx context.Context, c *apiclient.Client, r *http.Request, d
 			}
 			n["links"] = links
 		}
-		if f.Get("next_due") != "" {
-			due, e := time.Parse("2006-01-02", f.Get("next_due"))
+		if f.Get("remove_payment") == "on" {
+			delete(n, "payment")
+		} else if f.Get("next_due") != "" {
+			payment, _ := n["payment"].(map[string]any)
+			if payment == nil {
+				payment = map[string]any{"interval": 1, "unit": "months", "timezone": "UTC"}
+			}
+			timezone, _ := payment["timezone"].(string)
+			if _, ok := f["payment_timezone"]; ok {
+				timezone = f.Get("payment_timezone")
+			}
+			if timezone == "" {
+				timezone = "UTC"
+			}
+			loc, e := time.LoadLocation(timezone)
+			if e != nil {
+				return "", fmt.Errorf("неизвестный часовой пояс")
+			}
+			due, e := time.ParseInLocation("2006-01-02", f.Get("next_due"), loc)
 			if e != nil {
 				return "", e
 			}
-			interval, _ := strconv.Atoi(f.Get("payment_interval"))
-			n["payment"] = map[string]any{"next_due": due, "interval": interval, "unit": f.Get("payment_unit"), "timezone": "UTC", "amount": f.Get("amount"), "currency": f.Get("currency")}
+			payment["next_due"], payment["timezone"] = due, timezone
+			if _, ok := f["payment_interval"]; ok {
+				interval, e := strconv.Atoi(f.Get("payment_interval"))
+				if e != nil || interval < 1 || interval > 120 {
+					return "", fmt.Errorf("период должен быть от 1 до 120")
+				}
+				payment["interval"] = interval
+			}
+			if _, ok := f["payment_unit"]; ok {
+				payment["unit"] = f.Get("payment_unit")
+			}
+			for _, key := range []string{"amount", "currency"} {
+				if _, ok := f[key]; ok {
+					payment[key] = f.Get(key)
+				}
+			}
+			if _, ok := f["payment_note"]; ok {
+				payment["note"] = f.Get("payment_note")
+			}
+			n["payment"] = payment
 		}
 		var out map[string]any
 		if e := c.Do(ctx, method, path, n, &out, rev); e != nil {
