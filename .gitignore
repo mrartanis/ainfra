@@ -1,0 +1,8 @@
+.tools/
+bin/
+dist/
+.local/
+*.db
+*.db-shm
+*.db-wal
+coverage.out
