@@ -62,6 +62,11 @@ func TestStagePreservesSeparateRangesOfSameCanonicalAdvisory(t *testing.T) {
 	if err = stage.Emit(a); err != nil {
 		t.Fatal(err)
 	}
+	for i := 0; i < 3; i++ {
+		if err = stage.Emit(a); err != nil {
+			t.Fatal(err)
+		}
+	}
 	if err = stage.Walk(func(_ string, ads []domain.Advisory) error {
 		if len(ads) != 1 || len(ads[0].Ranges) != 2 {
 			t.Fatal("range lost", ads)

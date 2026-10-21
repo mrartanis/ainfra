@@ -137,7 +137,19 @@ func (s *Stage) source(path string) ([]domain.Advisory, error) {
 		key := a.ID + "/" + a.Release + "/" + a.Channel
 		old, exists := records[key]
 		if exists && a.NativeID == old.NativeID && strings.Contains(a.NativeID, "CVE-") && !reflect.DeepEqual(a, old) {
-			a.Ranges = append(advisoryRanges(old), advisoryRanges(a)...)
+			ranges := append(advisoryRanges(old), advisoryRanges(a)...)
+			seen := map[string]bool{}
+			a.Ranges = nil
+			for _, r := range ranges {
+				raw, _ := json.Marshal(r)
+				if !seen[string(raw)] {
+					a.Ranges = append(a.Ranges, r)
+					seen[string(raw)] = true
+				}
+			}
+			if len(a.Ranges) > 128 {
+				return nil, errors.New("advisory range limit exceeded")
+			}
 			a.Introduced = ""
 			a.Fixed = ""
 			a.Withdrawn = a.Withdrawn && old.Withdrawn

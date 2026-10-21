@@ -3,7 +3,7 @@ set -eu
 GO=${GO:-go}
 version=0.1.0
 mkdir -p dist
-"$GO" mod download
+"$GO" mod download all
 for platform in linux/amd64 linux/arm64 darwin/arm64; do
     os=${platform%/*}
     arch=${platform#*/}

@@ -13,9 +13,11 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 )
@@ -110,7 +112,17 @@ func run() error {
 		if _, err := store.Prune(ctx, policy, time.Now()); err != nil {
 			return err
 		}
+
+		listener, err := net.Listen("tcp", *listen)
+		if err != nil {
+			return err
+		}
+		defer listener.Close()
+		var workers sync.WaitGroup
+		defer func() { stop(); workers.Wait() }()
+		workers.Add(1)
 		go func() {
+			defer workers.Done()
 			ticker := time.NewTicker(time.Hour)
 			defer ticker.Stop()
 			for {
@@ -125,7 +137,9 @@ func run() error {
 			}
 		}()
 		if *enableFeeds {
+			workers.Add(1)
 			go func() {
+				defer workers.Done()
 				for {
 					if err := syncFeeds(ctx, svc); err != nil {
 						log.Print("feed sync failed; previous snapshot retained")
@@ -139,20 +153,10 @@ func run() error {
 			}()
 		}
 		server := &http.Server{Addr: *listen, Handler: httpapi.New(svc), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 35 * time.Second, WriteTimeout: 35 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 << 10}
-		go func() {
-			<-ctx.Done()
-			shutdown, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
-			server.Shutdown(shutdown)
-		}()
-		log.Printf("API listening on http://%s", *listen)
-		e = server.ListenAndServe()
-		if e == http.ErrServerClosed {
-			return nil
-		}
-		return e
+		log.Printf("API listening on http://%s", listener.Addr())
+		return serveUntilCancelled(ctx, server, listener)
 	default:
-		return fmt.Errorf("commands: serve, bootstrap, create-node, backup, version")
+		return fmt.Errorf("commands: serve, bootstrap, create-node, backup, sync-feeds, prune, version")
 	}
 }
 
