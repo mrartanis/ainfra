@@ -1,0 +1,60 @@
+package app_test
+
+import (
+	"ainfra/internal/app"
+	"ainfra/internal/domain"
+	"ainfra/internal/testkit"
+	"context"
+	"errors"
+	"testing"
+	"time"
+)
+
+func TestDocumentRevisionsAndHumanApproval(t *testing.T) {
+	s := app.New(testkit.NewStore(), time.Now, testkit.IDs())
+	ctx := context.Background()
+	ed := domain.Principal{ID: "llm", Role: "editor"}
+	ad := domain.Principal{ID: "human", Role: "admin"}
+	d, e := s.EditDocument(ctx, ed, domain.Document{Title: "Plan", Kind: "maintenance_plan", Body: "backup first"}, 0)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e = s.ApprovePlan(ctx, ed, d.ID, d.Revision); !errors.Is(e, app.ErrForbidden) {
+		t.Fatal(e)
+	}
+	d, e = s.ApprovePlan(ctx, ad, d.ID, d.Revision)
+	if e != nil || d.Status != "approved" {
+		t.Fatalf("%+v %v", d, e)
+	}
+	d.Body = "changed"
+	d, e = s.EditDocument(ctx, ed, d, d.Revision)
+	if e != nil || d.Status != "draft" || d.ApprovedRevision != 0 {
+		t.Fatalf("%+v %v", d, e)
+	}
+	if _, e = s.EditDocument(ctx, ed, d, 1); !errors.Is(e, app.ErrConflict) {
+		t.Fatal(e)
+	}
+	old, e := s.Document(ctx, ed, d.ID, 1)
+	if e != nil || old.Body != "backup first" {
+		t.Fatal(old, e)
+	}
+}
+func TestTokenScopesAndRevocation(t *testing.T) {
+	s := app.New(testkit.NewStore(), time.Now, testkit.IDs())
+	ctx := context.Background()
+	a := domain.Principal{Role: "admin", ID: "human"}
+	tok, meta, e := s.IssueToken(ctx, a, domain.Principal{Role: "reader"})
+	if e != nil {
+		t.Fatal(e)
+	}
+	p, e := s.Authenticate(ctx, tok)
+	if e != nil || p.Role != "reader" {
+		t.Fatal(p, e)
+	}
+	if e = s.RevokeToken(ctx, a, meta.ID); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = s.Authenticate(ctx, tok); !errors.Is(e, app.ErrForbidden) {
+		t.Fatal(e)
+	}
+}
