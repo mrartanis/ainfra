@@ -44,7 +44,7 @@ bin/infra-agent run --config /absolute/path/agent.json
 
 ```sh
 make test lint test-integration test-e2e test-security
-make test-race
+make test-race test-fuzz
 make build release release-check
 ```
 

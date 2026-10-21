@@ -104,6 +104,7 @@ with sync_playwright() as p:
         assert link.count() == 1 and url + link.get_attribute('href') == document_url
     page.goto(url + '/nodes/' + nodes['vm'] + '?edit=true')
     page.get_by_label('Назначение', exact=True).fill(prefix + ' edited purpose')
+    page.get_by_text('Оплата', exact=True).click()
     page.get_by_label('Следующая дата', exact=True).fill('2026-10-31')
     page.get_by_label('Часовой пояс', exact=True).fill('Europe/Berlin')
     page.get_by_label('Сумма', exact=True).fill('10')
@@ -115,6 +116,7 @@ with sync_playwright() as p:
     page.get_by_text('Бэкапы и оплата', exact=True).click()
     page.get_by_role('button', name='Оплатил', exact=True).click()
     page.goto(url + '/nodes/' + nodes['vm'] + '?edit=true')
+    page.get_by_text('Оплата', exact=True).click()
     assert page.get_by_label('Следующая дата', exact=True).input_value() == '2026-11-30'
     assert page.get_by_label('Часовой пояс', exact=True).input_value() == 'Europe/Berlin'
     assert page.get_by_label('Примечание к оплате', exact=True).input_value() == 'payment fixture note'

@@ -43,7 +43,7 @@ with tempfile.TemporaryDirectory(prefix='infra-release-') as directory:
     try:
         subprocess.run(['docker', 'run', '-d', '--platform', 'linux/' + arch, '--name', name, '--network', 'none', '--read-only',
                         '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', '--user', f'{os.getuid()}:{os.getgid()}',
-                        '--tmpfs', '/tmp:exec,mode=1777', '-v', f'{archive}:/release.tar.gz:ro', '-v', f'{config}:/config:ro',
+                        '--tmpfs', '/tmp:exec,mode=1777', '--tmpfs', '/usr/share/zoneinfo:ro,mode=0555', '-v', f'{archive}:/release.tar.gz:ro', '-v', f'{config}:/config:ro',
                         image, 'sleep', '600'], check=True, capture_output=True)
         execute('sh', '-c', 'mkdir /tmp/install /tmp/state; tar -xzf /release.tar.gz --strip-components=1 -C /tmp/install')
         for tool in ['go', 'python3', 'node', 'docker']:
@@ -60,6 +60,8 @@ with tempfile.TemporaryDirectory(prefix='infra-release-') as directory:
         execute('/tmp/install/bin/infra-agent', 'run', '--config', '/config/agent.json')
         observed = json.loads(cli('nodes', 'show', node['id']).stdout)
         assert observed['sequence'] == 1 and observed['observations']['packages']['data']['packages']
+        # Hide system zoneinfo to verify the embedded database, regardless of image contents.
+        execute('test', '!', '-e', '/usr/share/zoneinfo/Europe/Berlin')
         # Non-UTC recurrence must work even in the minimal image without tzdata.
         observed['payment'] = {'next_due': '2026-03-31T10:00:00+02:00', 'interval': 1,
                                'unit': 'months', 'timezone': 'Europe/Berlin', 'note': 'calendar smoke'}
