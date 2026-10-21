@@ -98,3 +98,29 @@ func TestNetworkCollectsBothRouteFamiliesAndExposesPartialFailure(t *testing.T) 
 		}
 	}
 }
+
+type virtualizationRunner struct{}
+
+func (virtualizationRunner) Run(_ context.Context, name string, _ ...string) ([]byte, error) {
+	if name == "systemd-detect-virt" {
+		return []byte("kvm\n"), nil
+	}
+	return nil, errors.New("unsupported")
+}
+func TestOSPreservesModelAndVirtualizationHint(t *testing.T) {
+	read := func(path string) ([]byte, error) {
+		switch path {
+		case "/etc/os-release":
+			return []byte("ID=debian\n"), nil
+		case "/sys/class/dmi/id/product_name":
+			return []byte("Virtual Machine\n"), nil
+		default:
+			return nil, os.ErrNotExist
+		}
+	}
+	c := linuxcollect.New(virtualizationRunner{}, read, time.Now)
+	raw := string(c.OS(context.Background()).Data)
+	if !strings.Contains(raw, `"model":"Virtual Machine"`) || !strings.Contains(raw, `"virtualization_hint":"kvm"`) || !strings.Contains(raw, `"uptime_seconds":null`) {
+		t.Fatal(raw)
+	}
+}

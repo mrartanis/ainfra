@@ -59,3 +59,34 @@ func TestPartialChecksApplyValidResults(t *testing.T) {
 		t.Fatal(n.Backups, e)
 	}
 }
+
+func TestBackupObservationFreshnessIsSeparateFromCopyFreshness(t *testing.T) {
+	now := time.Now().UTC()
+	svc := app.New(testkit.NewStore(), func() time.Time { return now }, testkit.IDs())
+	ctx := context.Background()
+	admin := domain.Principal{Role: "admin"}
+	n, err := svc.SaveNode(ctx, admin, domain.Node{Name: "host", Backups: []domain.Backup{{ID: "copy", Label: "daily", IntervalHours: 24, GraceHours: 2, LastSuccess: now, LastRestoreTest: now, ObservedAt: now.Add(-48 * time.Hour)}}}, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows, err := svc.Attention(ctx, admin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, row := range rows {
+		if row.NodeID == n.ID {
+			for _, reason := range row.Reasons {
+				if reason == "Бэкап daily: нет свежего результата проверки" {
+					found = true
+				}
+				if reason == "Бэкап daily: нет свежей копии" {
+					t.Fatal("fresh copy treated as stale")
+				}
+			}
+		}
+	}
+	if !found {
+		t.Fatal("stale check hidden by recent copy")
+	}
+}

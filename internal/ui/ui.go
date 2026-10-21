@@ -60,7 +60,7 @@ func New(base string, client *http.Client, dev bool, now func() time.Time) *UI {
 		return strings.Join(ss, ", ")
 	}, "short": func(v any) string {
 		s := fmt.Sprint(v)
-		if strings.HasPrefix(s, "0001-") {
+		if v == nil || strings.HasPrefix(s, "0001-") {
 			return "неизвестно"
 		}
 		return s

@@ -119,7 +119,16 @@ func (c *Collector) OS(ctx context.Context) domain.Section {
 		return failed("os_release_unavailable")
 	}
 	m := OSRelease(b)
-	d := domain.OSData{ID: m["ID"], Codename: m["VERSION_CODENAME"], Version: m["VERSION_ID"], Arch: runtime.GOARCH, CPU: runtime.NumCPU(), Reboot: "unknown"}
+	d := domain.OSData{ID: m["ID"], Codename: m["VERSION_CODENAME"], Version: m["VERSION_ID"], Arch: runtime.GOARCH, CPU: runtime.NumCPU(), Reboot: "unknown", VirtualizationHint: "unknown"}
+	if b, e = c.read("/sys/class/dmi/id/product_name"); e == nil && len(b) < 512 {
+		d.Model = strings.TrimSpace(string(b))
+	}
+	if b, e = c.run.Run(ctx, "systemd-detect-virt"); e == nil {
+		hint := strings.TrimSpace(string(b))
+		if len(hint) > 0 && len(hint) < 64 && !strings.ContainsAny(hint, " \t\r\n") {
+			d.VirtualizationHint = hint
+		}
+	}
 	if b, e = c.read("/proc/sys/kernel/hostname"); e == nil {
 		d.Hostname = strings.TrimSpace(string(b))
 	}
@@ -128,6 +137,15 @@ func (c *Collector) OS(ctx context.Context) domain.Section {
 	}
 	if b, e = c.read("/proc/meminfo"); e == nil {
 		for _, l := range strings.Split(string(b), "\n") {
+			if strings.HasPrefix(l, "MemFree:") {
+				fields := strings.Fields(l)
+				if len(fields) > 1 {
+					if value, err := strconv.ParseUint(fields[1], 10, 64); err == nil {
+						value *= 1024
+						d.MemoryFreeBytes = &value
+					}
+				}
+			}
 			if strings.HasPrefix(l, "MemTotal:") {
 				f := strings.Fields(l)
 				if len(f) > 1 {

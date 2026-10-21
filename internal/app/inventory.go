@@ -184,6 +184,9 @@ func (s *Service) Attention(ctx context.Context, p domain.Principal) (out []doma
 			a.Reasons = append(a.Reasons, "Оплата просрочена")
 		}
 		for _, b := range n.Backups {
+			if b.ObservedAt.IsZero() || s.now().Sub(b.ObservedAt) > time.Duration(b.IntervalHours+b.GraceHours)*time.Hour {
+				a.Reasons = append(a.Reasons, "Бэкап "+b.Label+": нет свежего результата проверки")
+			}
 			if b.LastAttemptStatus == "error" {
 				a.Reasons = append(a.Reasons, "Бэкап "+b.Label+": последняя попытка неудачна")
 			}
