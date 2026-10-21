@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	_ "modernc.org/sqlite"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,7 +23,7 @@ var migration string
 //go:embed migrations/002.sql
 var migration2 string
 
-type Store struct{ db *sql.DB }
+type Store struct{ db, readDB *sql.DB }
 type transaction struct {
 	tx  *sql.Tx
 	ctx context.Context
@@ -55,13 +56,36 @@ func Open(path string) (*Store, error) {
 		db.Close()
 		return nil, err
 	}
-	return &Store{db}, nil
+	absolute, err := filepath.Abs(path)
+	if err != nil {
+		db.Close()
+		return nil, err
+	}
+	uri := url.URL{Scheme: "file", Path: absolute}
+	uri.RawQuery = url.Values{"mode": {"ro"}, "_query_only": {"1"}, "_pragma": {"busy_timeout(5000)", "foreign_keys(1)"}}.Encode()
+	readers, err := sql.Open("sqlite", uri.String())
+	if err != nil {
+		db.Close()
+		return nil, err
+	}
+	readers.SetMaxOpenConns(4)
+	readers.SetMaxIdleConns(4)
+	if err = readers.Ping(); err != nil {
+		readers.Close()
+		db.Close()
+		return nil, err
+	}
+	return &Store{db: db, readDB: readers}, nil
 }
-func (s *Store) Close() error                                          { return s.db.Close() }
-func (s *Store) Read(ctx context.Context, f func(app.Tx) error) error  { return s.run(ctx, f) }
-func (s *Store) Write(ctx context.Context, f func(app.Tx) error) error { return s.run(ctx, f) }
-func (s *Store) run(ctx context.Context, f func(app.Tx) error) error {
-	tx, e := s.db.BeginTx(ctx, nil)
+func (s *Store) Close() error { return errors.Join(s.readDB.Close(), s.db.Close()) }
+func (s *Store) Read(ctx context.Context, f func(app.Tx) error) error {
+	return runTransaction(ctx, s.readDB, f)
+}
+func (s *Store) Write(ctx context.Context, f func(app.Tx) error) error {
+	return runTransaction(ctx, s.db, f)
+}
+func runTransaction(ctx context.Context, db *sql.DB, f func(app.Tx) error) error {
+	tx, e := db.BeginTx(ctx, nil)
 	if e != nil {
 		return e
 	}
@@ -118,7 +142,7 @@ func (s *Store) Search(ctx context.Context, q string, literal bool, limit, offse
 		query = "SELECT " + fmt.Sprintf(projection, "substr(body,MAX(1,instr(lower(body),lower(?))-80),240)") + " FROM records WHERE kind IN ('node','document') AND instr(lower(body),lower(?))>0 ORDER BY kind,id LIMIT ? OFFSET ?"
 		args = []any{q, q, limit, offset}
 	}
-	rows, e := s.db.QueryContext(ctx, query, args...)
+	rows, e := s.readDB.QueryContext(ctx, query, args...)
 	if e != nil {
 		return nil, e
 	}
@@ -247,6 +271,6 @@ func (s *Store) CountSearch(ctx context.Context, q string, literal bool) (count 
 	} else {
 		q = `"` + strings.ReplaceAll(q, `"`, `""`) + `"`
 	}
-	err = s.db.QueryRowContext(ctx, query, q).Scan(&count)
+	err = s.readDB.QueryRowContext(ctx, query, q).Scan(&count)
 	return
 }

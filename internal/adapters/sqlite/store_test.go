@@ -151,3 +151,65 @@ func TestSearchResultsAreBoundedAndCounted(t *testing.T) {
 		t.Fatal(count, e)
 	}
 }
+
+func TestReadersSeeCommittedSnapshotWhileWriterIsBusy(t *testing.T) {
+	store, err := sqlite.Open(filepath.Join(t.TempDir(), "concurrent.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	ctx := context.Background()
+	if err = store.Write(ctx, func(tx app.Tx) error {
+		return tx.Put("document", "doc", domain.Document{ID: "doc", Title: "Before", Body: "visible", Revision: 1})
+	}); err != nil {
+		t.Fatal(err)
+	}
+	entered, release := make(chan struct{}), make(chan struct{})
+	done := make(chan error, 1)
+	go func() {
+		done <- store.Write(ctx, func(tx app.Tx) error {
+			if err := tx.Put("document", "doc", domain.Document{ID: "doc", Title: "After", Body: "visible", Revision: 2}); err != nil {
+				return err
+			}
+			close(entered)
+			<-release
+			return nil
+		})
+	}()
+	<-entered
+	readCtx, cancel := context.WithTimeout(ctx, 250*time.Millisecond)
+	defer cancel()
+	err = store.Read(readCtx, func(tx app.Tx) error {
+		var d domain.Document
+		if err := tx.Get("document", "doc", &d); err != nil {
+			return err
+		}
+		if d.Title != "Before" {
+			t.Error("uncommitted state visible", d)
+		}
+		return nil
+	})
+	if err == nil {
+		_, err = store.Search(readCtx, "visible", false, 10, 0)
+	}
+	close(release)
+	if writerErr := <-done; writerErr != nil {
+		t.Fatal(writerErr)
+	}
+	if err != nil {
+		t.Fatal("read blocked by write transaction", err)
+	}
+	err = store.Read(ctx, func(tx app.Tx) error {
+		var d domain.Document
+		if err := tx.Get("document", "doc", &d); err != nil {
+			return err
+		}
+		if d.Title != "After" {
+			t.Error("commit not visible", d)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
