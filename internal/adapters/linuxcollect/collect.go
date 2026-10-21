@@ -54,13 +54,18 @@ func (r ExecRunner) Run(ctx context.Context, name string, args ...string) ([]byt
 }
 
 type Collector struct {
-	run  Runner
-	read func(string) ([]byte, error)
-	now  func() time.Time
+	wireguardSnapshot string
+	run               Runner
+	read              func(string) ([]byte, error)
+	now               func() time.Time
 }
 
-func New(r Runner, read func(string) ([]byte, error), now func() time.Time) *Collector {
-	return &Collector{r, read, now}
+func New(r Runner, read func(string) ([]byte, error), now func() time.Time, snapshots ...string) *Collector {
+	path := ""
+	if len(snapshots) > 0 {
+		path = snapshots[0]
+	}
+	return &Collector{run: r, read: read, now: now, wireguardSnapshot: path}
 }
 func (c *Collector) section(v any) domain.Section {
 	b, _ := json.Marshal(v)
@@ -354,6 +359,9 @@ func ParseShow(text string) map[string]domain.Package {
 	return out
 }
 func (c *Collector) WireGuard(ctx context.Context) domain.Section {
+	if c.wireguardSnapshot != "" {
+		return c.readWireGuardSnapshot()
+	}
 	data := map[string]string{}
 	for _, field := range []string{"public-key", "peers", "endpoints", "allowed-ips", "latest-handshakes"} {
 		b, e := c.run.Run(ctx, "wg", "show", "all", field)

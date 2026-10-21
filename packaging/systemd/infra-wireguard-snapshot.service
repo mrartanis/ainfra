@@ -1,0 +1,17 @@
+[Unit]
+Description=Optional local WireGuard public-state snapshot
+[Service]
+Type=oneshot
+User=infra-wg
+Group=infra-agent
+StateDirectory=infra-wireguard
+StateDirectoryMode=0750
+ExecStart=/usr/local/bin/infra-agent snapshot-wireguard --output /var/lib/infra-wireguard/public-state.json
+AmbientCapabilities=CAP_NET_ADMIN
+CapabilityBoundingSet=CAP_NET_ADMIN
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+RestrictAddressFamilies=AF_NETLINK AF_UNIX
+TimeoutStartSec=75s

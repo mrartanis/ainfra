@@ -31,6 +31,7 @@ func run() error {
 	f := flag.NewFlagSet("infra-agent "+cmd, flag.ContinueOnError)
 	config := f.String("config", "/etc/infra/agent.json", "config JSON")
 	file := f.String("file", "", "report file")
+	output := f.String("output", "", "helper snapshot output path")
 	refreshState := f.String("refresh-state", linuxcollect.APTRefreshPath, "managed APT refresh result path")
 	f.Bool("json", false, "JSON output")
 	if e := f.Parse(os.Args[2:]); e != nil {
@@ -39,6 +40,9 @@ func run() error {
 	if cmd == "version" {
 		fmt.Println("infra-agent 0.1.0")
 		return nil
+	}
+	if cmd == "snapshot-wireguard" {
+		return snapshotWireGuard(*output)
 	}
 	if cmd == "refresh-apt" {
 		return refreshAPT(*refreshState)
@@ -60,7 +64,7 @@ func run() error {
 		return e
 	}
 	transport := agent.APITransport{Client: &apiclient.Client{Base: c.Server, Token: secret, HTTP: h}}
-	collector := linuxcollect.New(linuxcollect.ExecRunner{}, os.ReadFile, time.Now)
+	collector := linuxcollect.New(linuxcollect.ExecRunner{}, os.ReadFile, time.Now, c.WireGuardSnapshotFile)
 	a := agent.New(c, collector, transport, time.Now, app.RandomID, agent.ExecCheckRunner{})
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
@@ -155,4 +159,31 @@ func refreshAPT(path string) error {
 		return os.Chmod(path, 0644) // Status only; readable by the unprivileged collector.
 	}
 	return linuxcollect.RefreshAPT(ctx, linuxcollect.ExecRunner{Timeout: 14 * time.Minute}, os.ReadFile, write, time.Now, path)
+}
+
+func snapshotWireGuard(path string) error {
+	if !filepath.IsAbs(path) {
+		return fmt.Errorf("absolute --output path required")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	c := linuxcollect.New(linuxcollect.ExecRunner{}, os.ReadFile, time.Now)
+	snapshot := c.WireGuard(ctx)
+	if snapshot.ObservedAt.IsZero() {
+		snapshot.ObservedAt = time.Now()
+	}
+	raw, err := json.Marshal(snapshot)
+	if err != nil {
+		return err
+	}
+	if err = agent.AtomicWrite(path, raw); err != nil {
+		return err
+	}
+	if err = os.Chmod(path, 0640); err != nil {
+		return err
+	}
+	if snapshot.Status != "ok" {
+		return fmt.Errorf("wireguard snapshot failed")
+	}
+	return nil
 }

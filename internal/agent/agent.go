@@ -17,16 +17,17 @@ import (
 )
 
 type Config struct {
-	CheckCommands []CheckCommand `json:"check_commands"`
-	NodeID        string         `json:"node_id"`
-	Instance      string         `json:"agent_instance_id"`
-	Server        string         `json:"server_url"`
-	TokenFile     string         `json:"token_file"`
-	CAFile        string         `json:"ca_file"`
-	StateDir      string         `json:"state_dir"`
-	Collectors    []string       `json:"collectors"`
-	CheckFiles    []string       `json:"check_files"`
-	ProbeTargets  []ProbeTarget  `json:"probe_targets"`
+	WireGuardSnapshotFile string         `json:"wireguard_snapshot_file"`
+	CheckCommands         []CheckCommand `json:"check_commands"`
+	NodeID                string         `json:"node_id"`
+	Instance              string         `json:"agent_instance_id"`
+	Server                string         `json:"server_url"`
+	TokenFile             string         `json:"token_file"`
+	CAFile                string         `json:"ca_file"`
+	StateDir              string         `json:"state_dir"`
+	Collectors            []string       `json:"collectors"`
+	CheckFiles            []string       `json:"check_files"`
+	ProbeTargets          []ProbeTarget  `json:"probe_targets"`
 }
 type ProbeTarget struct {
 	NodeID         string `json:"node_id"`
@@ -64,6 +65,9 @@ func LoadConfig(path string) (c Config, err error) {
 		}
 	}
 
+	if c.WireGuardSnapshotFile != "" && !filepath.IsAbs(c.WireGuardSnapshotFile) {
+		return c, errors.New("absolute WireGuard snapshot path required")
+	}
 	if len(c.CheckFiles)+len(c.CheckCommands) > 64 {
 		return c, errors.New("too many checks")
 	}

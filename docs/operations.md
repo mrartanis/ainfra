@@ -80,3 +80,11 @@ Probe target задаётся только в локальном agent config: n
 Добавьте OUTPUT_JSON в локальный `check_files` агента. Каталог должен существовать; например, владелец backup job, группа infra-agent, mode 2750; файл создаётся атомарно с 0640. Согласуйте права с фактическими пользователями. Без доступного результата агент покажет partial; успешная копия на сервере не стирается ошибкой следующей попытки. Для уже существующего typed JSON достаточно добавить его абсолютный путь в `check_files`, wrapper не нужен.
 
 `packaging/examples/payment-check.example.json` — явно маркированный образец результата локальной invoice-проверки. Замените дату наблюдения и значения данными своего локального учёта; никакой provider integration или автоматической оплаты нет. Наблюдение не переписывает вручную заданную дату оплаты.
+
+### Opt-in WireGuard helper
+
+Если обычному агенту не хватает прав, предусмотрены отдельные `infra-wireguard-snapshot.service/.timer`. Создайте системного пользователя infra-wg и группу infra-agent; права на бинарник и unit остаются у root. В локальном agent.json укажите `"wireguard_snapshot_file": "/var/lib/infra-wireguard/public-state.json"` и collector `wireguard`. Сначала проверьте unit вручную, затем явно включите timer.
+
+Helper вызывает только фиксированные `wg show all public-key/peers/endpoints/allowed-ips/latest-handshakes`; dump/showconf/private/preshared keys не запрашиваются. Он пишет атомарный snapshot (0640, группа infra-agent); основной агент лишь читает его, проверяет allowlist полей и сохраняет исходный observed_at. Ошибка helper не превращается в пустой список туннелей.
+
+`CAP_NET_ADMIN` технически даёт и права изменения сетевой конфигурации. Ограничение здесь — доверенный отдельный helper с фиксированными командами, а не обещание read-only capability. Основному агенту эта capability не выдаётся. Units не установлены/не включены автоматически; live проверка привилегированного WireGuard сбора на текущем хосте не выполнялась.
