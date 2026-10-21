@@ -114,3 +114,20 @@ func TestReportRejectsUnsafeOrUnboundedSectionPayload(t *testing.T) {
 		})
 	}
 }
+
+func TestSectionClockSkewCannotAccumulateWithEnvelopeSkew(t *testing.T) {
+	now := time.Now().UTC()
+	ctx := context.Background()
+	svc := app.New(testkit.NewStore(), func() time.Time { return now }, testkit.IDs())
+	n, err := svc.SaveNode(ctx, domain.Principal{Role: "admin"}, domain.Node{Name: "clock"}, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := domain.Principal{Role: "agent", Instance: "agent", Nodes: []string{n.ID}}
+	for _, offsets := range [][2]time.Duration{{6 * time.Minute, 0}, {4 * time.Minute, 8 * time.Minute}} {
+		r := domain.Report{SchemaVersion: 1, ID: "clock", NodeID: n.ID, Instance: "agent", Sequence: 1, ObservedAt: now.Add(offsets[0]), Collectors: map[string]domain.Section{"os": {Status: "ok", Complete: true, ObservedAt: now.Add(offsets[1]), Data: json.RawMessage(`{"id":"debian"}`)}}}
+		if _, err := svc.IngestReport(ctx, p, r); !errors.Is(err, app.ErrInvalid) {
+			t.Fatalf("future observation accepted: %v", err)
+		}
+	}
+}

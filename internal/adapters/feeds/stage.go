@@ -9,6 +9,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strings"
 )
@@ -135,6 +136,12 @@ func (s *Stage) source(path string) ([]domain.Advisory, error) {
 		}
 		key := a.ID + "/" + a.Release + "/" + a.Channel
 		old, exists := records[key]
+		if exists && a.NativeID == old.NativeID && strings.Contains(a.NativeID, "CVE-") && !reflect.DeepEqual(a, old) {
+			a.Ranges = append(advisoryRanges(old), advisoryRanges(a)...)
+			a.Introduced = ""
+			a.Fixed = ""
+			a.Withdrawn = a.Withdrawn && old.Withdrawn
+		}
 		if !exists || strings.Contains(a.NativeID, "CVE-") || !strings.Contains(old.NativeID, "CVE-") {
 			records[key] = a
 		}
@@ -162,4 +169,19 @@ func (s *Stage) Close() error {
 		return err
 	}
 	return e
+}
+
+func advisoryRanges(a domain.Advisory) []domain.AffectedRange {
+	if len(a.Ranges) > 0 {
+		return a.Ranges
+	}
+	introduced := a.Introduced
+	if introduced == "" {
+		introduced = "0"
+	}
+	events := []domain.VersionEvent{{Introduced: introduced}}
+	if a.Fixed != "" {
+		events = append(events, domain.VersionEvent{Fixed: a.Fixed})
+	}
+	return []domain.AffectedRange{{Events: events}}
 }

@@ -57,7 +57,7 @@ func (s *Service) IngestReport(ctx context.Context, p domain.Principal, r domain
 			return ack, ErrInvalid
 		}
 		if section.Status == "ok" || section.Status == "partial" {
-			if section.ObservedAt.IsZero() || section.ObservedAt.After(r.ObservedAt.Add(5*time.Minute)) || !json.Valid(section.Data) {
+			if section.ObservedAt.IsZero() || section.ObservedAt.After(s.now().Add(5*time.Minute)) || section.ObservedAt.After(r.ObservedAt.Add(5*time.Minute)) || !json.Valid(section.Data) {
 				return ack, ErrInvalid
 			}
 		}

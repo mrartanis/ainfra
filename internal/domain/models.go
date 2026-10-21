@@ -171,21 +171,31 @@ type OSData struct {
 	UptimeSeconds float64 `json:"uptime_seconds"`
 	Reboot        string  `json:"reboot"`
 }
+type VersionEvent struct {
+	Introduced   string `json:"introduced,omitempty"`
+	Fixed        string `json:"fixed,omitempty"`
+	LastAffected string `json:"last_affected,omitempty"`
+	Limit        string `json:"limit,omitempty"`
+}
+type AffectedRange struct {
+	Events []VersionEvent `json:"events"`
+}
 type Advisory struct {
-	ID         string `json:"id"`
-	NativeID   string `json:"native_id"`
-	Provider   string `json:"provider"`
-	Distro     string `json:"distro"`
-	Release    string `json:"release"`
-	Channel    string `json:"channel"`
-	Source     string `json:"source"`
-	Introduced string `json:"introduced"`
-	Fixed      string `json:"fixed"`
-	Status     string `json:"status"`
-	Severity   string `json:"severity"`
-	Notes      string `json:"notes"`
-	URL        string `json:"url"`
-	Withdrawn  bool   `json:"withdrawn"`
+	Ranges     []AffectedRange `json:"ranges,omitempty"`
+	ID         string          `json:"id"`
+	NativeID   string          `json:"native_id"`
+	Provider   string          `json:"provider"`
+	Distro     string          `json:"distro"`
+	Release    string          `json:"release"`
+	Channel    string          `json:"channel"`
+	Source     string          `json:"source"`
+	Introduced string          `json:"introduced"`
+	Fixed      string          `json:"fixed"`
+	Status     string          `json:"status"`
+	Severity   string          `json:"severity"`
+	Notes      string          `json:"notes"`
+	URL        string          `json:"url"`
+	Withdrawn  bool            `json:"withdrawn"`
 }
 type Feed struct {
 	ID             string    `json:"id"`

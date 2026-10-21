@@ -46,3 +46,28 @@ func TestDiskStageDeduplicatesAndCleansUp(t *testing.T) {
 		t.Fatal("staging left on disk")
 	}
 }
+
+func TestStagePreservesSeparateRangesOfSameCanonicalAdvisory(t *testing.T) {
+	stage, err := feeds.NewStage(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stage.Close()
+	a := domain.Advisory{ID: "CVE-1", NativeID: "UBUNTU-CVE-1", Source: "foo", Release: "24.04:LTS", Introduced: "1", Fixed: "2"}
+	if err = stage.Emit(a); err != nil {
+		t.Fatal(err)
+	}
+	a.Introduced = "3"
+	a.Fixed = "4"
+	if err = stage.Emit(a); err != nil {
+		t.Fatal(err)
+	}
+	if err = stage.Walk(func(_ string, ads []domain.Advisory) error {
+		if len(ads) != 1 || len(ads[0].Ranges) != 2 {
+			t.Fatal("range lost", ads)
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+}

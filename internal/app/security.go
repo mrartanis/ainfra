@@ -22,6 +22,9 @@ func Assess(p domain.Package, a domain.Advisory) (string, string) {
 	if a.Withdrawn || a.Status == "not_affected" || a.Fixed == "0" {
 		return "not_affected", "unknown"
 	}
+	if len(a.Ranges) > 0 {
+		return assessRanges(p, a)
+	}
 	if a.Introduced != "" && a.Introduced != "0" {
 		c, e := version.Compare(p.SourceVersion, a.Introduced)
 		if e != nil {

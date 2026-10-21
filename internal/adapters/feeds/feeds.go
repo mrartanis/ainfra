@@ -84,8 +84,8 @@ type osv struct {
 			Ecosystem string `json:"ecosystem"`
 		} `json:"package"`
 		Ranges []struct {
-			Type   string              `json:"type"`
-			Events []map[string]string `json:"events"`
+			Type   string                `json:"type"`
+			Events []domain.VersionEvent `json:"events"`
 		} `json:"ranges"`
 	} `json:"affected"`
 }
@@ -134,24 +134,65 @@ func Ubuntu(b []byte) ([]domain.Advisory, error) {
 		if len(eco) < 5 || eco[2] != '.' {
 			continue
 		}
+
+		ranges := []domain.AffectedRange{}
 		for _, rr := range p.Ranges {
 			if rr.Type != "ECOSYSTEM" {
 				continue
 			}
-			introduced := "0"
-			fixed := ""
-			for _, ev := range rr.Events {
-				if v, ok := ev["introduced"]; ok {
-					introduced = v
+			if len(rr.Events) == 0 {
+				return nil, errors.New("empty OSV events")
+			}
+			hasIntroduction := false
+			for _, event := range rr.Events {
+				hasIntroduction = hasIntroduction || event.Introduced != ""
+				fields := 0
+				for _, v := range []string{event.Introduced, event.Fixed, event.LastAffected, event.Limit} {
+					if v != "" {
+						fields++
+					}
 				}
-				if v, ok := ev["fixed"]; ok {
-					fixed = v
+				if fields != 1 {
+					return nil, errors.New("invalid OSV event")
 				}
 			}
-			for _, id := range ids {
-				out = append(out, domain.Advisory{ID: id, NativeID: v.ID, Provider: "ubuntu", Distro: "ubuntu", Release: eco, Channel: channel, Source: p.Package.Name, Introduced: introduced, Fixed: fixed, Status: status, Withdrawn: v.Withdrawn != "", URL: "https://ubuntu.com/security/" + id})
+			if !hasIntroduction {
+				return nil, errors.New("OSV range missing introduction")
 			}
+			ranges = append(ranges, domain.AffectedRange{Events: rr.Events})
 		}
+		if len(ranges) == 0 {
+			continue
+		}
+		introduced, fixed := "", ""
+		complex := len(ranges) > 1
+		if len(ranges) == 1 {
+			starts, ends := 0, 0
+			for _, event := range ranges[0].Events {
+				if event.Introduced != "" {
+					introduced = event.Introduced
+					starts++
+				}
+				if event.Fixed != "" {
+					fixed = event.Fixed
+					ends++
+				}
+				if event.LastAffected != "" || event.Limit != "" {
+					complex = true
+				}
+			}
+			complex = complex || starts != 1 || ends > 1
+		}
+		for _, id := range ids {
+			advisory := domain.Advisory{ID: id, NativeID: v.ID, Provider: "ubuntu", Distro: "ubuntu", Release: eco, Channel: channel, Source: p.Package.Name, Introduced: introduced, Fixed: fixed, Status: status, Withdrawn: v.Withdrawn != "", URL: "https://ubuntu.com/security/" + id}
+			if complex {
+				advisory.Ranges = ranges
+				advisory.Introduced = ""
+				advisory.Fixed = ""
+			}
+			out = append(out, advisory)
+		}
+
 	}
 	return out, nil
 }

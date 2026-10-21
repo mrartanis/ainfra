@@ -65,6 +65,15 @@
         "provider": {
           "type": "string"
         },
+        "ranges": {
+          "items": {
+            "$ref": "#/$defs/AffectedRange"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
         "release": {
           "type": "string"
         },
@@ -99,6 +108,24 @@
         "notes",
         "url",
         "withdrawn"
+      ],
+      "type": "object"
+    },
+    "AffectedRange": {
+      "additionalProperties": false,
+      "properties": {
+        "events": {
+          "items": {
+            "$ref": "#/$defs/VersionEvent"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "events"
       ],
       "type": "object"
     },
@@ -1235,6 +1262,25 @@
         "revoked",
         "created_at"
       ],
+      "type": "object"
+    },
+    "VersionEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "fixed": {
+          "type": "string"
+        },
+        "introduced": {
+          "type": "string"
+        },
+        "last_affected": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "string"
+        }
+      },
+      "required": [],
       "type": "object"
     }
   },
