@@ -53,6 +53,13 @@ func (s *Service) IngestReport(ctx context.Context, p domain.Principal, r domain
 			if e := ValidateChecks(section.Data); e != nil {
 				return ack, e
 			}
+			var checks []Check
+			_ = json.Unmarshal(section.Data, &checks)
+			for _, check := range checks {
+				if check.ObservedAt.After(s.now().Add(5*time.Minute)) || check.ObservedAt.After(r.ObservedAt.Add(5*time.Minute)) || check.ObservedAt.After(section.ObservedAt.Add(5*time.Minute)) {
+					return ack, ErrInvalid
+				}
+			}
 		}
 		if !contains([]string{"os", "packages", "network", "wireguard", "checks", "disks"}, name) || !contains([]string{"ok", "partial", "error", "unsupported", "disabled"}, section.Status) {
 			return ack, ErrInvalid
@@ -115,7 +122,7 @@ func (s *Service) IngestReport(ctx context.Context, p domain.Principal, r domain
 			// Each typed check is independently timestamped; a failed sibling
 			// must not hide a valid backup failure or success.
 			if k == "checks" && (v.Status == "ok" || v.Status == "partial") && len(v.Data) > 0 {
-				if e := applyChecks(&n, v.Data); e != nil {
+				if e := applyChecks(&n, v.Data, v.Status == "ok" && v.Complete); e != nil {
 					return e
 				}
 			}
@@ -157,6 +164,7 @@ func (s *Service) SaveNode(ctx context.Context, p domain.Principal, n domain.Nod
 			n.Slug = n.ID
 			n.Revision = 1
 			n.Sequence = 0
+			n.PaymentChecks = nil
 			n.Instance = ""
 			n.LastReport = time.Time{}
 			n.ReceivedAt = time.Time{}
@@ -193,6 +201,7 @@ func (s *Service) SaveNode(ctx context.Context, p domain.Principal, n domain.Nod
 			n.ReceivedAt = old.ReceivedAt
 			n.Sequence = old.Sequence
 			n.Instance = old.Instance
+			n.PaymentChecks = old.PaymentChecks
 		}
 		if n.Kind == "" {
 			n.Kind = "other"

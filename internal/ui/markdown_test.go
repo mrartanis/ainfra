@@ -24,7 +24,7 @@ func TestDocumentPreviewFormatsMarkdownWithoutActiveHTML(t *testing.T) {
 
 func TestPreviewDoesNotWriteAPIAndPreservesRevision(t *testing.T) {
 	u := New("http://unused", nil, false, time.Now)
-	r := httptest.NewRequest("POST", "/docs/preview", strings.NewReader("id=doc&revision=7&title=Title&kind=note&body=%23+Draft&nodes=node"))
+	r := httptest.NewRequest("POST", "/docs/preview", strings.NewReader("id=doc&revision=7&title=Title&kind=note&body=%23+Draft&nodes=node&tags=backup,restore"))
 	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	if err := r.ParseForm(); err != nil {
 		t.Fatal(err)
@@ -35,6 +35,9 @@ func TestPreviewDoesNotWriteAPIAndPreservesRevision(t *testing.T) {
 		t.Fatal(dest, err, data)
 	}
 	doc := data["Document"].(map[string]any)
+	if tags, ok := doc["tags"].([]string); !ok || len(tags) != 2 || tags[1] != "restore" {
+		t.Fatal("tags lost in preview", doc)
+	}
 	if doc["revision"] != 7 || doc["body"] != "# Draft" {
 		t.Fatal(doc)
 	}

@@ -28,3 +28,29 @@ func TestRelationsAndCalendarPayment(t *testing.T) {
 		t.Fatal(n.Payment, e)
 	}
 }
+
+func TestDuplicateRelationPreservesCreationTimeAndAudit(t *testing.T) {
+	now := time.Now().UTC()
+	ctx := context.Background()
+	svc := app.New(testkit.NewStore(), func() time.Time { return now }, testkit.IDs())
+	admin := domain.Principal{Role: "admin"}
+	a, _ := svc.SaveNode(ctx, admin, domain.Node{Name: "a"}, 0)
+	b, _ := svc.SaveNode(ctx, admin, domain.Node{Name: "b"}, 0)
+	r, err := svc.SaveRelation(ctx, admin, domain.Relation{Source: a.ID, Target: b.ID, Type: "tunnel_peer", Name: "wg"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !r.CreatedAt.Equal(now) || !r.UpdatedAt.Equal(now) {
+		t.Fatal("missing creation time", r)
+	}
+	before, _ := svc.Events(ctx, admin)
+	now = now.Add(time.Hour)
+	repeated, err := svc.SaveRelation(ctx, admin, domain.Relation{Source: b.ID, Target: a.ID, Type: "tunnel_peer", Name: "wg"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	after, _ := svc.Events(ctx, admin)
+	if repeated != r || len(after) != len(before) {
+		t.Fatal("retry changed relation or audit", repeated, r, len(before), len(after))
+	}
+}

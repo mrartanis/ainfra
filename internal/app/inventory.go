@@ -35,6 +35,12 @@ func (s *Service) SaveRelation(ctx context.Context, p domain.Principal, r domain
 		if e != nil {
 			return e
 		}
+		for _, existing := range rows {
+			if existing.ID == r.ID {
+				out = existing
+				return nil
+			}
+		}
 		if r.Type == "runs_on" {
 			edges := map[string][]string{}
 			for _, v := range rows {
@@ -64,6 +70,8 @@ func (s *Service) SaveRelation(ctx context.Context, p domain.Principal, r domain
 			}
 		}
 		r.Revision = 1
+		r.CreatedAt = s.now()
+		r.UpdatedAt = r.CreatedAt
 		out = r
 		if e = tx.Put("relation", r.ID, r); e != nil {
 			return e
@@ -182,6 +190,17 @@ func (s *Service) Attention(ctx context.Context, p domain.Principal) (out []doma
 		}
 		if n.Payment != nil && n.Payment.NextDue.Before(s.now()) {
 			a.Reasons = append(a.Reasons, "Оплата просрочена")
+		}
+		for id, check := range n.PaymentChecks {
+			if check.Status == "error" {
+				a.Reasons = append(a.Reasons, "Оплата "+id+": последняя проверка неудачна")
+			}
+			if check.ObservedAt.IsZero() || s.now().Sub(check.ObservedAt) > 24*time.Hour {
+				a.Reasons = append(a.Reasons, "Оплата "+id+": нет свежей проверки")
+			}
+			if !check.LastSuccessAt.IsZero() && check.NextDue.Before(s.now()) {
+				a.Reasons = append(a.Reasons, "Оплата "+id+": наблюдаемая дата платежа прошла")
+			}
 		}
 		for _, b := range n.Backups {
 			if b.ObservedAt.IsZero() || s.now().Sub(b.ObservedAt) > time.Duration(b.IntervalHours+b.GraceHours)*time.Hour {

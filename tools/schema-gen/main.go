@@ -94,7 +94,7 @@ func main() {
 		for k, v := range full {
 			fields[k] = v
 		}
-		for _, k := range []string{"observations", "collector_status", "sequence", "last_report", "received_at", "agent_instance_id", "author", "updated_at", "status", "approved_revision", "approved_hash", "approver", "evidence_hash", "needs_revalidation"} {
+		for _, k := range []string{"payment_checks", "observations", "collector_status", "sequence", "last_report", "received_at", "agent_instance_id", "author", "updated_at", "status", "approved_revision", "approved_hash", "approver", "evidence_hash", "needs_revalidation"} {
 			if field, ok := fields[k].(schema); ok {
 				copy := schema{}
 				for name, value := range field {

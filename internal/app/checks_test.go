@@ -6,6 +6,8 @@ import (
 	"ainfra/internal/testkit"
 	"context"
 	"encoding/json"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 )
@@ -95,5 +97,102 @@ func TestBackupObservationFreshnessIsSeparateFromCopyFreshness(t *testing.T) {
 	}
 	if !found {
 		t.Fatal("stale check hidden by recent copy")
+	}
+}
+
+func TestObservedPaymentDoesNotPayOrOverwriteManualSchedule(t *testing.T) {
+	now := time.Now().UTC()
+	ctx := context.Background()
+	svc := app.New(testkit.NewStore(), func() time.Time { return now }, testkit.IDs())
+	admin := domain.Principal{Role: "admin"}
+	manualDue := now.AddDate(0, 1, 0)
+	observedDue := now.AddDate(0, 0, 3)
+	n, err := svc.SaveNode(ctx, admin, domain.Node{Name: "billing", Payment: &domain.Payment{NextDue: manualDue, Interval: 1, Unit: "months", Timezone: "UTC"}}, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	send := func(seq uint64, status string, at time.Time) {
+		data, _ := json.Marshal([]app.Check{{SchemaVersion: 1, ID: "provider-invoice", Kind: "payment", Status: status, ObservedAt: at, Data: mustJSON(t, app.PaymentResult{NextDue: observedDue, Amount: "10", Currency: "EUR", Evidence: "invoice fixture"})}})
+		r := domain.Report{SchemaVersion: 1, ID: fmt.Sprint(seq), NodeID: n.ID, Instance: "i", Sequence: seq, ObservedAt: now, Collectors: map[string]domain.Section{"checks": {Status: "partial", Complete: false, ObservedAt: now, Data: data}}}
+		if _, err := svc.IngestReport(ctx, domain.Principal{Role: "agent", Nodes: []string{n.ID}, Instance: "i"}, r); err != nil {
+			t.Fatal(err)
+		}
+	}
+	send(1, "ok", now)
+	got, err := svc.Node(ctx, admin, n.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	payment := got.PaymentChecks["provider-invoice"]
+	if !payment.NextDue.Equal(observedDue) || !got.Payment.NextDue.Equal(manualDue) || !got.Payment.LastPaid.IsZero() {
+		t.Fatal(got.Payment, payment)
+	}
+	successAt := now
+	now = now.Add(time.Hour)
+	send(2, "error", now)
+	attention, err := svc.Attention(ctx, admin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	warned := false
+	for _, reason := range attention[0].Reasons {
+		if strings.Contains(reason, "provider-invoice") && strings.Contains(reason, "неудачна") {
+			warned = true
+		}
+	}
+	if !warned {
+		t.Fatal("payment check failure hidden from attention", attention)
+	}
+	// A stale manual form cannot erase observed payment facts.
+	n.Purpose = "edited"
+	got, err = svc.SaveNode(ctx, admin, n, n.Revision)
+	if err != nil {
+		t.Fatal(err)
+	}
+	payment = got.PaymentChecks["provider-invoice"]
+	if payment.Status != "error" || !payment.LastSuccessAt.Equal(successAt) || !payment.NextDue.Equal(observedDue) {
+		t.Fatal(payment)
+	}
+	send(3, "ok", successAt.Add(-time.Minute))
+	got, _ = svc.Node(ctx, admin, n.ID)
+	if got.PaymentChecks["provider-invoice"].Status != "error" {
+		t.Fatal("old success hid latest failure")
+	}
+	cleared := domain.Report{SchemaVersion: 1, ID: "clear", NodeID: n.ID, Instance: "i", Sequence: 4, ObservedAt: now, Collectors: map[string]domain.Section{"checks": {Status: "ok", Complete: true, ObservedAt: now, Data: json.RawMessage(`[]`)}}}
+	if _, err := svc.IngestReport(ctx, domain.Principal{Role: "agent", Nodes: []string{n.ID}, Instance: "i"}, cleared); err != nil {
+		t.Fatal(err)
+	}
+	got, _ = svc.Node(ctx, admin, n.ID)
+	if len(got.PaymentChecks) != 0 || !got.Payment.NextDue.Equal(manualDue) {
+		t.Fatal("removed check retained or manual schedule changed", got)
+	}
+}
+
+func mustJSON(t *testing.T, v any) json.RawMessage {
+	t.Helper()
+	raw, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return raw
+}
+
+func TestCheckCannotPoisonFreshnessWithFutureTimestamp(t *testing.T) {
+	now := time.Now().UTC()
+	ctx := context.Background()
+	svc := app.New(testkit.NewStore(), func() time.Time { return now }, testkit.IDs())
+	admin := domain.Principal{Role: "admin"}
+	n, _ := svc.SaveNode(ctx, admin, domain.Node{Name: "checks"}, 0)
+	data := mustJSON(t, []app.Check{{SchemaVersion: 1, ID: "invoice", Kind: "payment", Status: "ok", ObservedAt: now.Add(time.Hour), Data: mustJSON(t, app.PaymentResult{NextDue: now.AddDate(0, 1, 0)})}})
+	report := domain.Report{SchemaVersion: 1, ID: "future-check", NodeID: n.ID, Instance: "i", Sequence: 1, ObservedAt: now, Collectors: map[string]domain.Section{"checks": {Status: "ok", Complete: true, ObservedAt: now, Data: data}}}
+	if _, err := svc.IngestReport(ctx, domain.Principal{Role: "agent", Nodes: []string{n.ID}, Instance: "i"}, report); err != app.ErrInvalid {
+		t.Fatal("future check accepted", err)
+	}
+}
+
+func TestFailedPaymentCheckDoesNotRequireInventedDueDate(t *testing.T) {
+	raw := json.RawMessage(`[{"schema_version":1,"check_id":"invoice","kind":"payment","observed_at":"2026-10-21T12:00:00Z","status":"error","data":{"evidence":"provider unavailable"}}]`)
+	if err := app.ValidateChecks(raw); err != nil {
+		t.Fatal(err)
 	}
 }

@@ -36,9 +36,15 @@ with sync_playwright() as p:
         page.get_by_label('Назначение', exact=True).fill('Browser acceptance fixture')
         page.get_by_label('Hostname', exact=True).fill(prefix + '-' + name + '.invalid')
         page.get_by_label('Адреса через запятую').fill('192.0.2.15')
+        page.get_by_label('Владелец', exact=True).fill(prefix + ' owner')
+        page.get_by_label('Провайдер', exact=True).fill('fixture provider')
+        page.get_by_label('Расположение', exact=True).fill('fixture location')
+        page.get_by_label('Ссылки (название = URL, по одной строке)', exact=True).fill('Panel = https://example.invalid/panel')
         page.get_by_role('button', name='Сохранить', exact=True).click()
         assert page.get_by_role('heading', name=prefix + '-' + name, exact=True).is_visible()
         nodes[name] = page.url.rsplit('/', 1)[1]
+        assert page.get_by_text(prefix + ' owner', exact=True).is_visible()
+        assert page.get_by_role('link', name='Panel', exact=True).get_attribute('href') == 'https://example.invalid/panel'
     for target, relation in [('host', 'runs_on'), ('router', 'uses_gateway'), ('backup', 'backs_up_to')]:
         page.goto(url + '/nodes/' + nodes['vm'])
         page.get_by_text('Добавить связь', exact=True).click()
@@ -85,11 +91,13 @@ with sync_playwright() as p:
     page.goto(url + '/docs/new')
     page.get_by_label('Заголовок').fill(prefix + ' shared runbook')
     page.get_by_label('Связанные узлы (UUID через запятую)').fill(nodes['vm'] + ',' + nodes['host'])
+    page.get_by_label('Теги через запятую', exact=True).fill('backup, restore')
     page.get_by_label('Markdown', exact=True).fill('# Preview heading\n\n**Evidence** ' + prefix)
     page.get_by_role('button', name='Предпросмотр', exact=True).click()
     assert page.locator('.markdown h1').inner_text() == 'Preview heading'
     page.get_by_role('button', name='Сохранить новую ревизию').click()
     document_url = page.url
+    assert page.get_by_label('Теги через запятую', exact=True).input_value() == 'backup, restore'
     for name in ['vm', 'host']:
         page.goto(url + '/nodes/' + nodes[name] + '?tab=records')
         link = page.get_by_role('link', name=prefix + ' shared runbook')

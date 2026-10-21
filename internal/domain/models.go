@@ -40,30 +40,31 @@ type Ack struct {
 	Status string `json:"status"`
 }
 type Node struct {
-	WireGuardPublicKeys []string           `json:"wireguard_public_keys"`
-	ID                  string             `json:"id"`
-	Name                string             `json:"name"`
-	Slug                string             `json:"slug"`
-	Hostname            string             `json:"hostname"`
-	Addresses           []string           `json:"addresses"`
-	Kind                string             `json:"kind"`
-	Lifecycle           string             `json:"lifecycle"`
-	Purpose             string             `json:"purpose"`
-	Criticality         string             `json:"criticality"`
-	Labels              map[string]string  `json:"labels"`
-	Tags                []string           `json:"tags"`
-	Links               map[string]string  `json:"links"`
-	CustomFields        map[string]any     `json:"custom_fields,omitempty"`
-	Revision            int                `json:"revision"`
-	Instance            string             `json:"agent_instance_id,omitempty"`
-	Sequence            uint64             `json:"sequence"`
-	LastReport          time.Time          `json:"last_report"`
-	ReceivedAt          time.Time          `json:"received_at"`
-	Observations        map[string]Section `json:"observations"`
-	CollectorStatus     map[string]Section `json:"collector_status"`
-	Services            []Service          `json:"services"`
-	Payment             *Payment           `json:"payment,omitempty"`
-	Backups             []Backup           `json:"backups"`
+	PaymentChecks       map[string]PaymentObservation `json:"payment_checks"`
+	WireGuardPublicKeys []string                      `json:"wireguard_public_keys"`
+	ID                  string                        `json:"id"`
+	Name                string                        `json:"name"`
+	Slug                string                        `json:"slug"`
+	Hostname            string                        `json:"hostname"`
+	Addresses           []string                      `json:"addresses"`
+	Kind                string                        `json:"kind"`
+	Lifecycle           string                        `json:"lifecycle"`
+	Purpose             string                        `json:"purpose"`
+	Criticality         string                        `json:"criticality"`
+	Labels              map[string]string             `json:"labels"`
+	Tags                []string                      `json:"tags"`
+	Links               map[string]string             `json:"links"`
+	CustomFields        map[string]any                `json:"custom_fields,omitempty"`
+	Revision            int                           `json:"revision"`
+	Instance            string                        `json:"agent_instance_id,omitempty"`
+	Sequence            uint64                        `json:"sequence"`
+	LastReport          time.Time                     `json:"last_report"`
+	ReceivedAt          time.Time                     `json:"received_at"`
+	Observations        map[string]Section            `json:"observations"`
+	CollectorStatus     map[string]Section            `json:"collector_status"`
+	Services            []Service                     `json:"services"`
+	Payment             *Payment                      `json:"payment,omitempty"`
+	Backups             []Backup                      `json:"backups"`
 }
 type Service struct {
 	Name         string `json:"name"`
@@ -97,13 +98,15 @@ type Backup struct {
 	Evidence          string    `json:"evidence"`
 }
 type Relation struct {
-	ID         string `json:"id"`
-	Source     string `json:"source"`
-	Target     string `json:"target"`
-	Type       string `json:"type"`
-	Name       string `json:"name"`
-	Provenance string `json:"provenance"`
-	Revision   int    `json:"revision"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
+	ID         string    `json:"id"`
+	Source     string    `json:"source"`
+	Target     string    `json:"target"`
+	Type       string    `json:"type"`
+	Name       string    `json:"name"`
+	Provenance string    `json:"provenance"`
+	Revision   int       `json:"revision"`
 }
 type Document struct {
 	ID                string    `json:"id"`
@@ -266,4 +269,15 @@ type RelationSuggestion struct {
 	Provenance string    `json:"provenance"`
 	ObservedAt time.Time `json:"observed_at"`
 	Evidence   string    `json:"evidence"`
+}
+
+// PaymentObservation is check evidence, independent of the manual payment schedule.
+type PaymentObservation struct {
+	ObservedAt    time.Time `json:"observed_at"`
+	Status        string    `json:"status"`
+	LastSuccessAt time.Time `json:"last_success_at"`
+	NextDue       time.Time `json:"next_due"`
+	Amount        string    `json:"amount"`
+	Currency      string    `json:"currency"`
+	Evidence      string    `json:"evidence"`
 }

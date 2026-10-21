@@ -26,7 +26,7 @@ const Help = `infractl — клиент HTTP API Infra
   request METHOD API_PATH [--file JSON] [--if-revision N]
   --limit N --offset N: страница списка; --page-info: данные с метаданными страницы.
   --json: машинный JSON; --config: JSON с endpoint, token_file, ca_file.
-  Формат docs put: JSON {id?, title, kind, body, nodes?}; без id создаёт документ.
+  Формат docs put: JSON {id?, title, kind, body, nodes?, tags?}; без id создаёт документ.
 `
 
 func Run(ctx context.Context, c *apiclient.Client, args []string, out io.Writer) error {

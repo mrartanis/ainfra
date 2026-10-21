@@ -321,9 +321,25 @@
             }
           },
           "then": {
-            "properties": {
-              "data": {
-                "$ref": "#/$defs/PaymentResult"
+            "else": {
+              "properties": {
+                "data": {
+                  "$ref": "#/$defs/PaymentErrorResult"
+                }
+              }
+            },
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "ok"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "data": {
+                  "$ref": "#/$defs/PaymentResult"
+                }
               }
             }
           }
@@ -797,6 +813,15 @@
             }
           ]
         },
+        "payment_checks": {
+          "additionalProperties": {
+            "$ref": "#/$defs/PaymentObservation"
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
         "purpose": {
           "type": "string"
         },
@@ -843,6 +868,7 @@
         }
       },
       "required": [
+        "payment_checks",
         "wireguard_public_keys",
         "id",
         "name",
@@ -968,6 +994,16 @@
             {
               "type": "null"
             }
+          ]
+        },
+        "payment_checks": {
+          "additionalProperties": {
+            "$ref": "#/$defs/PaymentObservation"
+          },
+          "readOnly": true,
+          "type": [
+            "object",
+            "null"
           ]
         },
         "purpose": {
@@ -1502,13 +1538,76 @@
       ],
       "type": "object"
     },
-    "PaymentResult": {
+    "PaymentErrorResult": {
+      "additionalProperties": false,
+      "properties": {
+        "amount": {
+          "maxLength": 128,
+          "type": "string"
+        },
+        "currency": {
+          "maxLength": 32,
+          "type": "string"
+        },
+        "evidence": {
+          "maxLength": 4096,
+          "type": "string"
+        },
+        "next_due_date": {
+          "format": "date-time",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "PaymentObservation": {
       "additionalProperties": false,
       "properties": {
         "amount": {
           "type": "string"
         },
         "currency": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "string"
+        },
+        "last_success_at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "next_due": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "observed_at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "observed_at",
+        "status",
+        "last_success_at",
+        "next_due",
+        "amount",
+        "currency",
+        "evidence"
+      ],
+      "type": "object"
+    },
+    "PaymentResult": {
+      "additionalProperties": false,
+      "properties": {
+        "amount": {
+          "maxLength": 128,
+          "type": "string"
+        },
+        "currency": {
+          "maxLength": 32,
           "type": "string"
         },
         "evidence": {
@@ -1614,6 +1713,10 @@
     "Relation": {
       "additionalProperties": false,
       "properties": {
+        "created_at": {
+          "format": "date-time",
+          "type": "string"
+        },
         "id": {
           "type": "string"
         },
@@ -1634,9 +1737,15 @@
         },
         "type": {
           "type": "string"
+        },
+        "updated_at": {
+          "format": "date-time",
+          "type": "string"
         }
       },
       "required": [
+        "created_at",
+        "updated_at",
         "id",
         "source",
         "target",
@@ -1650,6 +1759,10 @@
     "RelationInput": {
       "additionalProperties": false,
       "properties": {
+        "created_at": {
+          "format": "date-time",
+          "type": "string"
+        },
         "id": {
           "type": "string"
         },
@@ -1669,6 +1782,10 @@
           "type": "string"
         },
         "type": {
+          "type": "string"
+        },
+        "updated_at": {
+          "format": "date-time",
           "type": "string"
         }
       },

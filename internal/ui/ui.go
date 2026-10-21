@@ -16,6 +16,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -45,7 +46,19 @@ type UI struct {
 }
 
 func New(base string, client *http.Client, dev bool, now func() time.Time) *UI {
-	funcs := template.FuncMap{"markdown": renderMarkdown, "json": func(v any) string { b, _ := json.MarshalIndent(v, "", "  "); return string(b) }, "join": func(v any) string {
+	funcs := template.FuncMap{"pairs": func(v any) string {
+		m, _ := v.(map[string]any)
+		keys := make([]string, 0, len(m))
+		for k := range m {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		lines := []string{}
+		for _, k := range keys {
+			lines = append(lines, k+" = "+fmt.Sprint(m[k]))
+		}
+		return strings.Join(lines, "\n")
+	}, "markdown": renderMarkdown, "json": func(v any) string { b, _ := json.MarshalIndent(v, "", "  "); return string(b) }, "join": func(v any) string {
 		if ss, ok := v.([]string); ok {
 			return strings.Join(ss, ", ")
 		}
@@ -381,6 +394,38 @@ func (u *UI) mutate(ctx context.Context, c *apiclient.Client, r *http.Request, d
 		n["addresses"] = split(f.Get("addresses"))
 		n["wireguard_public_keys"] = split(f.Get("wireguard_public_keys"))
 		n["tags"] = split(f.Get("tags"))
+		labels, _ := n["labels"].(map[string]any)
+		if labels == nil {
+			labels = map[string]any{}
+		}
+		for _, key := range []string{"owner", "provider", "location"} {
+			if _, ok := f[key]; ok {
+				if value := strings.TrimSpace(f.Get(key)); value != "" {
+					labels[key] = value
+				} else {
+					delete(labels, key)
+				}
+			}
+		}
+		n["labels"] = labels
+		if _, ok := f["links"]; ok {
+			links := map[string]string{}
+			for _, line := range strings.Split(f.Get("links"), "\n") {
+				if strings.TrimSpace(line) == "" {
+					continue
+				}
+				key, value, ok := strings.Cut(line, "=")
+				key, value = strings.TrimSpace(key), strings.TrimSpace(value)
+				if !ok || key == "" || value == "" {
+					return "", fmt.Errorf("ссылка: ожидается название = URL")
+				}
+				if _, exists := links[key]; exists {
+					return "", fmt.Errorf("названия ссылок должны различаться")
+				}
+				links[key] = value
+			}
+			n["links"] = links
+		}
 		if f.Get("next_due") != "" {
 			due, e := time.Parse("2006-01-02", f.Get("next_due"))
 			if e != nil {
@@ -396,7 +441,7 @@ func (u *UI) mutate(ctx context.Context, c *apiclient.Client, r *http.Request, d
 		return "/nodes/" + fmt.Sprint(out["id"]), nil
 	case "/docs/save", "/docs/preview":
 		id := f.Get("id")
-		v := map[string]any{"id": id, "title": f.Get("title"), "kind": f.Get("kind"), "body": f.Get("body"), "nodes": split(f.Get("nodes"))}
+		v := map[string]any{"id": id, "title": f.Get("title"), "kind": f.Get("kind"), "body": f.Get("body"), "nodes": split(f.Get("nodes")), "tags": split(f.Get("tags"))}
 		if r.URL.Path == "/docs/preview" {
 			v["revision"] = rev
 			data["Page"], data["Title"], data["Document"], data["Preview"] = "document", "Предпросмотр", v, true

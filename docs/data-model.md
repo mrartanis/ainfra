@@ -9,3 +9,7 @@ Node UUID постоянен. Ручные поля и observed sections раз�
 Findings: assessment/remediation/workflow раздельны; inventory_at/feed_at независимы. Естественный ключ: node/source/advisory/channel. Несколько binary packages объединяются. Suppression требует admin, причину и срок. Изменения assessment отражаются в events.
 
 Feeds группируются по source package, заменяются атомарно. Ошибочный импорт не заменяет активный snapshot. Дисковый staging приватен и удаляется после завершения. Сроки истории и размер БД ограничены политикой retention.
+
+Ручные связи содержат `created_at`/`updated_at`; повтор той же связи (включая обратную пару tunnel_peer) возвращает существующую запись без нового события. У старых записей без дат остаётся неизвестное время — дата не выдумывается при чтении.
+
+`payment_checks` — отдельная карта наблюдений по check_id, не ручной график `payment`. Она хранит latest observed_at/status и last_success_at/next_due/amount/currency/evidence последнего успеха. Ошибка сохраняет предыдущий успех; устаревший результат не заменяет новый. Agent не может выставить LastPaid. SaveNode сохраняет наблюдения независимо от устаревшей формы. Полный успешный checks snapshot удаляет отсутствующие ID; partial сохраняет их, максимум 1000 ID. Summary исключает текст evidence. Время вложенной проверки ограничено тем же 5-минутным допуском, что отчёт и секция.

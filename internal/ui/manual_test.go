@@ -65,3 +65,30 @@ func TestEditAndDeleteEmbeddedRecordsPreserveObservations(t *testing.T) {
 		})
 	}
 }
+
+func TestNodeMetadataEditPreservesOtherLabels(t *testing.T) {
+	var saved map[string]any
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "GET" {
+			w.Write([]byte(`{"id":"node","revision":3,"labels":{"owner":"old","custom":"keep"},"links":{"old":"https://old.invalid"}}`))
+			return
+		}
+		if err := json.NewDecoder(r.Body).Decode(&saved); err != nil {
+			t.Error(err)
+		}
+		w.Write([]byte(`{"id":"node"}`))
+	}))
+	defer api.Close()
+	u := New(api.URL, api.Client(), false, time.Now)
+	c := &apiclient.Client{Base: api.URL, HTTP: api.Client()}
+	r := httptest.NewRequest("POST", "/nodes/save", nil)
+	r.Form = url.Values{"id": {"node"}, "revision": {"3"}, "name": {"host"}, "owner": {"new"}, "provider": {"cloud"}, "location": {"west"}, "links": {"Panel = https://panel.invalid/?q=a=b\nDocs = https://docs.invalid"}}
+	if _, err := u.mutate(r.Context(), c, r, map[string]any{}); err != nil {
+		t.Fatal(err)
+	}
+	labels := saved["labels"].(map[string]any)
+	links := saved["links"].(map[string]any)
+	if labels["owner"] != "new" || labels["custom"] != "keep" || labels["provider"] != "cloud" || links["Panel"] != "https://panel.invalid/?q=a=b" || len(links) != 2 {
+		t.Fatal(labels, links)
+	}
+}

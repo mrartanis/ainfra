@@ -34,7 +34,10 @@ func payloadSchemas() {
 	backup["properties"].(schema)["evidence"] = schema{"type": "string", "maxLength": 4096}
 	payment := defs["PaymentResult"].(schema)
 	payment["required"] = []string{"next_due_date"}
+	payment["properties"].(schema)["amount"] = schema{"type": "string", "maxLength": 128}
+	payment["properties"].(schema)["currency"] = schema{"type": "string", "maxLength": 32}
 	payment["properties"].(schema)["evidence"] = schema{"type": "string", "maxLength": 4096}
+	optional("PaymentResult", "PaymentErrorResult")
 	check := defs["Check"].(schema)
 	cp := check["properties"].(schema)
 	cp["schema_version"] = schema{"const": 1}
@@ -43,7 +46,11 @@ func payloadSchemas() {
 	cp["status"] = schema{"enum": []string{"ok", "error"}}
 	check["allOf"] = []any{
 		schema{"if": schema{"properties": schema{"kind": schema{"const": "backup"}}}, "then": schema{"properties": schema{"data": schema{"$ref": "#/$defs/BackupResult"}}}},
-		schema{"if": schema{"properties": schema{"kind": schema{"const": "payment"}}}, "then": schema{"properties": schema{"data": schema{"$ref": "#/$defs/PaymentResult"}}}},
+		schema{"if": schema{"properties": schema{"kind": schema{"const": "payment"}}}, "then": schema{
+			"if":   schema{"properties": schema{"status": schema{"const": "ok"}}},
+			"then": schema{"properties": schema{"data": schema{"$ref": "#/$defs/PaymentResult"}}},
+			"else": schema{"properties": schema{"data": schema{"$ref": "#/$defs/PaymentErrorResult"}}},
+		}},
 	}
 	collectors := defs["Report"].(schema)["properties"].(schema)["collectors"].(schema)
 	specific := schema{}

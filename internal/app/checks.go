@@ -51,7 +51,7 @@ func ValidateChecks(b json.RawMessage) error {
 		switch c.Kind {
 		case "backup":
 			var v BackupResult
-			if strict(c.Data, &v) != nil || v.LastAttempt.IsZero() || !contains([]string{"success", "error"}, v.LastAttemptStatus) || len(v.Evidence) > 4096 {
+			if strict(c.Data, &v) != nil || v.LastAttempt.IsZero() || v.LastAttempt.After(c.ObservedAt) || !contains([]string{"success", "error"}, v.LastAttemptStatus) || len(v.Evidence) > 4096 {
 				return ErrInvalid
 			}
 			if v.LastSuccess != nil && v.LastSuccess.After(c.ObservedAt) {
@@ -62,7 +62,7 @@ func ValidateChecks(b json.RawMessage) error {
 			}
 		case "payment":
 			var v PaymentResult
-			if strict(c.Data, &v) != nil || v.NextDue.IsZero() || len(v.Evidence) > 4096 {
+			if strict(c.Data, &v) != nil || (c.Status == "ok" && v.NextDue.IsZero()) || len(v.Amount) > 128 || len(v.Currency) > 32 || len(v.Evidence) > 4096 {
 				return ErrInvalid
 			}
 		default:
@@ -71,13 +71,47 @@ func ValidateChecks(b json.RawMessage) error {
 	}
 	return nil
 }
-func applyChecks(n *domain.Node, b json.RawMessage) error {
+func applyChecks(n *domain.Node, b json.RawMessage, complete bool) error {
 	if e := ValidateChecks(b); e != nil {
 		return e
 	}
 	var cs []Check
 	_ = json.Unmarshal(b, &cs)
+	if complete {
+		current := map[string]bool{}
+		for _, c := range cs {
+			if c.Kind == "payment" {
+				current[c.ID] = true
+			}
+		}
+		for id := range n.PaymentChecks {
+			if !current[id] {
+				delete(n.PaymentChecks, id)
+			}
+		}
+	}
 	for _, c := range cs {
+		if c.Kind == "payment" {
+			if n.PaymentChecks == nil {
+				n.PaymentChecks = map[string]domain.PaymentObservation{}
+			}
+			if _, exists := n.PaymentChecks[c.ID]; !exists && len(n.PaymentChecks) >= 1000 {
+				return ErrInvalid
+			}
+			previous := n.PaymentChecks[c.ID]
+			if c.ObservedAt.Before(previous.ObservedAt) {
+				continue
+			}
+			previous.ObservedAt, previous.Status = c.ObservedAt, c.Status
+			if c.Status == "ok" {
+				var v PaymentResult
+				_ = json.Unmarshal(c.Data, &v)
+				previous.NextDue, previous.Currency, previous.Amount = v.NextDue, v.Currency, v.Amount
+				previous.Evidence, previous.LastSuccessAt = v.Evidence, c.ObservedAt
+			}
+			n.PaymentChecks[c.ID] = previous
+			continue
+		}
 		if c.Kind != "backup" {
 			continue
 		}

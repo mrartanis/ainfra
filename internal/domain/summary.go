@@ -33,6 +33,14 @@ func SummarizeNode(n Node) Node {
 			observations["packages"] = packages
 		}
 	}
+	if n.PaymentChecks != nil {
+		checks := make(map[string]PaymentObservation, len(n.PaymentChecks))
+		for id, c := range n.PaymentChecks {
+			c.Evidence = ""
+			checks[id] = c
+		}
+		n.PaymentChecks = checks
+	}
 	n.Observations = observations
 	return n
 }

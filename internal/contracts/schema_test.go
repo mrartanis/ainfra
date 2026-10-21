@@ -113,6 +113,8 @@ func TestReportSchemaDescribesTypedCollectorPayloads(t *testing.T) {
 		{"packages", `{"packages":[{"name":"openssl","secret":"forbidden"}]}`, false},
 		{"checks", `[{"schema_version":1,"check_id":"copy","kind":"backup","observed_at":"2026-10-21T12:00:00Z","status":"error","data":{"last_attempt_at":"2026-10-21T12:00:00Z","last_attempt_status":"error"}}]`, true},
 		{"checks", `[{"schema_version":1,"check_id":"copy","kind":"backup","observed_at":"2026-10-21T12:00:00Z","status":"ok","data":{"last_attempt_at":"2026-10-21T12:00:00Z","last_attempt_status":"invented"}}]`, false},
+		{"checks", `[{"schema_version":1,"check_id":"invoice","kind":"payment","observed_at":"2026-10-21T12:00:00Z","status":"error","data":{"evidence":"unavailable"}}]`, true},
+		{"checks", `[{"schema_version":1,"check_id":"invoice","kind":"payment","observed_at":"2026-10-21T12:00:00Z","status":"ok","data":{}}]`, false},
 	} {
 		report := domain.Report{SchemaVersion: 1, ID: "r", NodeID: "node", Instance: "i", Sequence: 1, ObservedAt: now, Collectors: map[string]domain.Section{tc.name: {Status: "ok", Complete: true, ObservedAt: now, Data: json.RawMessage(tc.data)}}}
 		raw, _ := json.Marshal(report)
