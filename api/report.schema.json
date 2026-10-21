@@ -452,6 +452,10 @@
         "remediation": {
           "type": "string"
         },
+        "resolved_at": {
+          "format": "date-time",
+          "type": "string"
+        },
         "suppressed_until": {
           "format": "date-time",
           "type": "string"
@@ -472,6 +476,7 @@
         "suppressed_until",
         "first_seen",
         "last_evaluated",
+        "resolved_at",
         "inventory_at",
         "feed_at"
       ],

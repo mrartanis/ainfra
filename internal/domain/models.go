@@ -202,6 +202,7 @@ type Finding struct {
 	SuppressedUntil time.Time `json:"suppressed_until"`
 	FirstSeen       time.Time `json:"first_seen"`
 	LastEvaluated   time.Time `json:"last_evaluated"`
+	ResolvedAt      time.Time `json:"resolved_at"`
 	InventoryAt     time.Time `json:"inventory_at"`
 	FeedAt          time.Time `json:"feed_at"`
 }

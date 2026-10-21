@@ -6,6 +6,7 @@ import (
 	"ainfra/internal/domain"
 	"context"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -62,5 +63,94 @@ func TestRetentionBoundsHistoryPreservesCurrentAndOpen(t *testing.T) {
 	})
 	if e != nil {
 		t.Fatal(e)
+	}
+}
+
+func TestResolvedRetentionUsesClosureTimeAndHistoryCap(t *testing.T) {
+	s, err := sqlite.Open(filepath.Join(t.TempDir(), "state.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	ctx := context.Background()
+	now := time.Now().UTC()
+	err = s.Write(ctx, func(tx app.Tx) error {
+		for i, id := range []string{"a", "b", "c"} {
+			if err := tx.Put("event", id, map[string]any{"at": now.Add(time.Duration(i) * time.Second)}); err != nil {
+				return err
+			}
+		}
+		return tx.Put("finding", "closed", map[string]any{"workflow": "resolved", "resolved_at": now.AddDate(0, 0, -100), "last_evaluated": now})
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.Prune(ctx, sqlite.Retention{Days: 30, MaxHistory: 2, DocumentRevisions: 2}, now); err != nil {
+		t.Fatal(err)
+	}
+	err = s.Read(ctx, func(tx app.Tx) error {
+		rows, err := tx.List("finding")
+		if err != nil {
+			return err
+		}
+		if len(rows) != 0 {
+			t.Fatal("reassessment extended closed finding retention")
+		}
+		rows, err = tx.List("event")
+		if err != nil {
+			return err
+		}
+		if len(rows) != 2 {
+			t.Fatalf("history cap: %d", len(rows))
+		}
+		var v map[string]any
+		if err := tx.Get("event", "a", &v); err != app.ErrNotFound {
+			t.Fatalf("oldest recent event retained: %v", err)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestDatabaseSizeLimitRollsBackOversizedWrite(t *testing.T) {
+	s, err := sqlite.Open(filepath.Join(t.TempDir(), "state.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	ctx := context.Background()
+	if err := s.SetSizeLimit(ctx, 64); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Write(ctx, func(tx app.Tx) error { return tx.Put("sentinel", "keep", map[string]string{"value": "original"}) }); err != nil {
+		t.Fatal(err)
+	}
+	oversized := strings.Repeat("x", 65<<20)
+	err = s.Write(ctx, func(tx app.Tx) error {
+		if err := tx.Put("sentinel", "keep", map[string]string{"value": "changed"}); err != nil {
+			return err
+		}
+		return tx.Put("blob", "oversized", map[string]string{"value": oversized})
+	})
+	if err == nil {
+		t.Fatal("write exceeded configured database size")
+	}
+	err = s.Read(ctx, func(tx app.Tx) error {
+		var v map[string]string
+		if err := tx.Get("sentinel", "keep", &v); err != nil {
+			return err
+		}
+		if v["value"] != "original" {
+			t.Fatal("failed transaction was partially committed")
+		}
+		if err := tx.Get("blob", "oversized", &v); err != app.ErrNotFound {
+			t.Fatalf("oversized record persisted: %v", err)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }

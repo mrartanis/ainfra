@@ -29,3 +29,5 @@ OpenAPI 3.1 и JSON Schemas созданы в api/, воспроизводимы
 Performance milestone: компактные node-summary/finding-summary, schema 002 и node_id index; migration v1→v2 покрыта тестом. Тест 5000 packages доказывает компактность list и сохранность полного inventory. Suppression expiry обновляет attention без отчёта.
 
 Нагрузка 100×5000 / 10000 docs на 2 CPU / 2 GiB прошла: p95 nodes 2.66 ms, attention 3.89 ms, search 24.12 ms, peak RSS ~124 MiB. Детали/ограничения docs/load-benchmark.md. Введены bounded API pages, headers, UI navigation, server-side filters и потоковый постраничный CLI export. Search выдаёт bounded snippets вместо полных документов/пакетных снимков. Полный /export JSON endpoint удалён до релиза: CLI обходит обычные versioned API resources, manifest отмечает per-record consistency.
+
+Retention audit: найден и исправлен sliding expiry закрытых findings. TDD: heartbeat/fixed/source removed не продлевают resolved_at, reopen очищает его. Реальная SQLite проверена на cap свежих events и rollback oversized transaction при лимите 64 MiB; предыдущие данные сохранены. JSON schemas обновлены.

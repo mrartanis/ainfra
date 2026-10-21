@@ -70,7 +70,7 @@ func (s *Store) Prune(ctx context.Context, p Retention, now time.Time) (out Rete
 	}
 	n, _ := res.RowsAffected()
 	out.Deleted += n
-	res, e = tx.ExecContext(ctx, `DELETE FROM records WHERE kind='finding' AND json_extract(body,'$.workflow')='resolved' AND julianday(json_extract(body,'$.last_evaluated'))<julianday(?)`, cutoff)
+	res, e = tx.ExecContext(ctx, `DELETE FROM records WHERE kind='finding' AND json_extract(body,'$.workflow')='resolved' AND julianday(COALESCE(NULLIF(json_extract(body,'$.resolved_at'),'0001-01-01T00:00:00Z'),json_extract(body,'$.last_evaluated')))<julianday(?)`, cutoff)
 	if e != nil {
 		return out, e
 	}

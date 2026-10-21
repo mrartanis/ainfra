@@ -284,6 +284,7 @@ func (s *Service) reassess(tx Tx, n domain.Node) error {
 			} else if f.Workflow == "resolved" {
 				f.Workflow = "open"
 			}
+			setClosureTime(&f, old, s.now())
 			if e = tx.Put("finding", key, f); e != nil {
 				return e
 			}
@@ -302,6 +303,7 @@ func (s *Service) reassess(tx Tx, n domain.Node) error {
 		if f.NodeID != n.ID || seen[f.ID] {
 			continue
 		}
+		previous := f
 		if !sources[f.Advisory.Source] {
 			f.Workflow = "resolved"
 			f.Reason = "source absent from complete inventory"
@@ -309,9 +311,13 @@ func (s *Service) reassess(tx Tx, n domain.Node) error {
 			f.Assessment = "unknown"
 			f.Remediation = "unknown"
 			f.Reason = "advisory coverage lost"
+			if f.Workflow == "resolved" {
+				f.Workflow = "open"
+			}
 		}
 		f.InventoryAt = sec.ObservedAt
 		f.LastEvaluated = s.now()
+		setClosureTime(&f, previous, s.now())
 		if e = tx.Put("finding", f.ID, f); e != nil {
 			return e
 		}
@@ -341,4 +347,22 @@ func (s *Service) Suppress(ctx context.Context, p domain.Principal, id, reason s
 		}
 		return s.event(tx, p, "finding.suppressed", id, reason)
 	})
+}
+
+// A heartbeat must not extend the retention period of a closed finding.
+func setClosureTime(f *domain.Finding, previous domain.Finding, now time.Time) {
+	if f.Workflow != "resolved" {
+		f.ResolvedAt = time.Time{}
+		return
+	}
+	if previous.Workflow != "resolved" {
+		f.ResolvedAt = now
+		return
+	}
+	if f.ResolvedAt.IsZero() {
+		f.ResolvedAt = previous.LastEvaluated // Legacy records have no closure timestamp.
+		if f.ResolvedAt.IsZero() {
+			f.ResolvedAt = now
+		}
+	}
 }
