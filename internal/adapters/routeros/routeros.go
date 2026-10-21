@@ -85,7 +85,7 @@ func (c *Collector) Collect(ctx context.Context, _ []string) map[string]domain.S
 	}
 	cpu, e1 := strconv.Atoi(r["cpu-count"])
 	mem, e2 := strconv.ParseUint(r["total-memory"], 10, 64)
-	if e1 != nil || e2 != nil {
+	if e1 != nil || e2 != nil || cpu < 1 {
 		out["os"] = domain.Section{Status: "error", ErrorCode: "resource_format"}
 		return out
 	}
