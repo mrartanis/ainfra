@@ -14,6 +14,15 @@ jobs:
       - run: make GO=go test-fuzz
       - run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
       - run: python3 scripts/collector-matrix.py
+  arm64-collectors:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
+        with:
+          go-version: '1.27.3'
+      - run: make GO=go build
+      - run: python3 scripts/collector-matrix.py --arch arm64
   race:
     runs-on: ubuntu-latest
     steps:
