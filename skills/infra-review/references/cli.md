@@ -9,5 +9,6 @@ infractl — клиент HTTP API Infra
   tokens revoke ID | feeds status | events | me
   context NODE [--format markdown] | export --output NEW_DIRECTORY
   request METHOD API_PATH [--file JSON] [--if-revision N]
+  --limit N --offset N: страница списка; --page-info: данные с метаданными страницы.
   --json: машинный JSON; --config: JSON с endpoint, token_file, ca_file.
   Формат docs put: JSON {id?, title, kind, body, nodes?}; без id создаёт документ.

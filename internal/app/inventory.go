@@ -133,7 +133,7 @@ func (s *Service) Pay(ctx context.Context, p domain.Principal, id string, rev in
 		n.Payment.NextDue = next
 		n.Payment.LastPaid = s.now()
 		n.Revision++
-		if e = tx.Put("node", id, n); e != nil {
+		if e = putNode(tx, n); e != nil {
 			return e
 		}
 		return s.event(tx, p, "payment.paid", id, next.Format(time.RFC3339))
@@ -146,12 +146,19 @@ func (s *Service) Attention(ctx context.Context, p domain.Principal) (out []doma
 		return nil, err
 	}
 	out = []domain.Attention{}
-	feeds, _ := s.Feeds(ctx, p)
+	feeds, err := s.Feeds(ctx, p)
+	if err != nil {
+		return nil, err
+	}
+	summaries, err := s.findingSummaries(ctx)
+	if err != nil {
+		return nil, err
+	}
 	for _, n := range nodes {
 		if n.Lifecycle == "retired" {
 			continue
 		}
-		a := domain.Attention{NodeID: n.ID, Name: n.Name, LastReport: n.LastReport, Reasons: []string{}}
+		a := domain.Attention{NodeID: n.ID, Name: n.Name, Purpose: n.Purpose, Addresses: n.Addresses, LastReport: n.LastReport, Reasons: []string{}}
 		if n.LastReport.IsZero() || s.now().Sub(n.LastReport) > 2*time.Hour {
 			a.Reasons = append(a.Reasons, "Нет свежего отчёта")
 		}
@@ -202,31 +209,20 @@ func (s *Service) Attention(ctx context.Context, p domain.Principal) (out []doma
 		if pd.MetadataStatus != "fresh" {
 			a.Reasons = append(a.Reasons, "APT: свежесть метаданных не подтверждена")
 		}
-		unknown, updates := 0, 0
-		for _, pkg := range pd.Packages {
-			if pkg.Origin == "" || pkg.SourceVersion == "" {
-				unknown++
-			}
-			if cmp, err := version.Compare(pkg.Candidate, pkg.Version); err == nil && cmp > 0 {
-				updates++
-			}
-		}
+		unknown, updates := pd.UnknownOrigins, pd.Updates
 		if unknown > 0 {
 			a.Reasons = append(a.Reasons, fmt.Sprintf("Пакеты: неизвестное происхождение у %d", unknown))
 		}
 		if updates > 0 {
 			a.Reasons = append(a.Reasons, fmt.Sprintf("Обычные обновления: %d", updates))
 		}
-		fs, err := s.Findings(ctx, p, n.ID)
-		if err != nil {
-			return nil, err
-		}
 		findingCounts := map[string]int{}
-		for _, f := range fs {
-			if f.Workflow != "resolved" && !(f.Workflow == "suppressed" && f.SuppressedUntil.After(s.now())) {
-				findingCounts[f.Assessment+" / "+f.Remediation]++
+		for _, bucket := range summaries[n.ID].Buckets {
+			if bucket.Workflow != "resolved" && !(bucket.Workflow == "suppressed" && bucket.SuppressedUntil.After(s.now())) {
+				findingCounts[bucket.Assessment+" / "+bucket.Remediation] += bucket.Count
 			}
 		}
+
 		for status, count := range findingCounts {
 			a.Reasons = append(a.Reasons, fmt.Sprintf("CVE: %d — %s", count, status))
 		}
@@ -334,4 +330,28 @@ func (s *Service) Settings(ctx context.Context, p domain.Principal) (out map[str
 		return nil
 	})
 	return
+}
+
+func (s *Service) QueryAttention(ctx context.Context, p domain.Principal, filter, order string) ([]domain.Attention, error) {
+	if !contains([]string{"", "attention", "stale"}, filter) || !contains([]string{"", "attention", "name"}, order) {
+		return nil, ErrInvalid
+	}
+	rows, e := s.Attention(ctx, p)
+	if e != nil {
+		return nil, e
+	}
+	out := []domain.Attention{}
+	for _, r := range rows {
+		if filter == "attention" && len(r.Reasons) == 0 {
+			continue
+		}
+		if filter == "stale" && !r.LastReport.IsZero() && s.now().Sub(r.LastReport) <= 2*time.Hour {
+			continue
+		}
+		out = append(out, r)
+	}
+	if order == "name" {
+		sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	}
+	return out, nil
 }

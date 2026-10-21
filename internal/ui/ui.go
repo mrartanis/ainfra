@@ -14,7 +14,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -134,14 +133,50 @@ func (u *UI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	data := map[string]any{"CSRF": s.CSRF, "Role": s.Role, "Page": "nodes", "Title": "Узлы"}
 	client := &apiclient.Client{Base: u.base, Token: s.Token, HTTP: u.client}
 	ctx := r.Context()
+
 	get := func(path, key string) error {
+		endpoint, e := url.Parse(path)
+		if e != nil {
+			return e
+		}
+		q := endpoint.Query()
+		offsetKey := strings.ToLower(key) + "-offset"
+		if offset := r.URL.Query().Get(offsetKey); offset != "" {
+			q.Set("offset", offset)
+		}
+		endpoint.RawQuery = q.Encode()
 		var v any
-		if e := client.Do(ctx, "GET", path, nil, &v, 0); e != nil {
+		var info apiclient.Page
+		if e = client.Do(ctx, "GET", endpoint.String(), nil, &v, 0, &info); e != nil {
 			return e
 		}
 		data[key] = v
+		if info.NextOffset >= 0 || info.Offset > 0 {
+			link := func(offset int) string {
+				u := *r.URL
+				q := u.Query()
+				q.Set(offsetKey, strconv.Itoa(offset))
+				u.RawQuery = q.Encode()
+				return u.String()
+			}
+			labels := map[string]string{"Attention": "Узлы", "Nodes": "Узлы для связи", "Findings": "Замечания", "Packages": "Пакеты", "Documents": "Записи", "Events": "История", "Relations": "Связи", "Tokens": "Токены", "Results": "Результаты поиска"}
+			control := map[string]any{"Name": labels[key], "Total": info.Total}
+			if info.NextOffset >= 0 {
+				control["Next"] = link(info.NextOffset)
+			}
+			if info.Offset > 0 {
+				prev := info.Offset - info.Limit
+				if prev < 0 {
+					prev = 0
+				}
+				control["Previous"] = link(prev)
+			}
+			pages, _ := data["Pages"].([]any)
+			data["Pages"] = append(pages, control)
+		}
 		return nil
 	}
+
 	fail := func(e error) {
 		data["Page"] = "error"
 		data["Title"] = "Не удалось выполнить запрос"
@@ -225,32 +260,12 @@ func (u *UI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
 	switch {
 	case path == "/":
-		if e := get("attention", "Attention"); e != nil {
-			fail(e)
-			return
-		}
-		if e := get("nodes", "Nodes"); e != nil {
+		if e := get("attention?filter="+url.QueryEscape(r.URL.Query().Get("filter"))+"&sort="+url.QueryEscape(r.URL.Query().Get("sort")), "Attention"); e != nil {
 			fail(e)
 			return
 		}
 		data["Filter"] = r.URL.Query().Get("filter")
 		data["Sort"] = r.URL.Query().Get("sort")
-		rows, _ := data["Attention"].([]any)
-		filtered := []any{}
-		for _, row := range rows {
-			m := row.(map[string]any)
-			observed, _ := time.Parse(time.RFC3339Nano, fmt.Sprint(m["last_report"]))
-			if data["Filter"] == "stale" && !observed.IsZero() && u.now().Sub(observed) <= 2*time.Hour {
-				continue
-			}
-			filtered = append(filtered, row)
-		}
-		if data["Sort"] == "name" {
-			sort.Slice(filtered, func(i, j int) bool {
-				return fmt.Sprint(filtered[i].(map[string]any)["name"]) < fmt.Sprint(filtered[j].(map[string]any)["name"])
-			})
-		}
-		data["Attention"] = filtered
 	case path == "/nodes/new":
 		data["Page"] = "node-edit"
 		data["Title"] = "Добавить узел"
@@ -268,7 +283,16 @@ func (u *UI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Query().Get("edit") == "true" {
 			data["Page"] = "node-edit"
 		} else {
-			for _, x := range [][2]string{{"nodes/" + id + "/findings", "Findings"}, {"nodes/" + id + "/packages", "Packages"}, {"documents", "Documents"}, {"relations", "Relations"}, {"nodes", "Nodes"}, {"events", "Events"}} {
+			requests := [][2]string{}
+			switch tab {
+			case "packages":
+				requests = append(requests, [2]string{"nodes/" + id + "/packages", "Packages"})
+			case "records":
+				requests = append(requests, [2]string{"documents?node=" + id, "Documents"}, [2]string{"events?node=" + id, "Events"})
+			default:
+				requests = append(requests, [2]string{"nodes/" + id + "/findings", "Findings"}, [2]string{"relations?node=" + id, "Relations"}, [2]string{"nodes", "Nodes"}, [2]string{"documents?node=" + id, "Documents"})
+			}
+			for _, x := range requests {
 				if e := get(x[0], x[1]); e != nil {
 					fail(e)
 					return

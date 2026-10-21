@@ -6,6 +6,7 @@ import (
 	"ainfra/internal/testkit"
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 )
@@ -50,5 +51,38 @@ func TestUbuntuUnfixedAndUnknownOrigin(t *testing.T) {
 	assessment, _ = app.Assess(p, a)
 	if assessment != "unknown" {
 		t.Fatal(assessment)
+	}
+}
+
+func TestAttentionSuppressionExpiresWithoutNewReport(t *testing.T) {
+	ctx := context.Background()
+	now := time.Date(2026, 10, 21, 12, 0, 0, 0, time.UTC)
+	store := testkit.NewStore()
+	s := app.New(store, func() time.Time { return now }, testkit.IDs())
+	admin := domain.Principal{Role: "admin"}
+	n, _ := s.SaveNode(ctx, admin, domain.Node{Name: "node"}, 0)
+	f := domain.Finding{ID: "f", NodeID: n.ID, Assessment: "affected", Remediation: "no_fix_published", Workflow: "open"}
+	if e := store.Write(ctx, func(tx app.Tx) error { return tx.Put("finding", f.ID, f) }); e != nil {
+		t.Fatal(e)
+	}
+	if e := s.Suppress(ctx, admin, f.ID, "maintenance window", now.Add(time.Hour)); e != nil {
+		t.Fatal(e)
+	}
+	before, e := s.Attention(ctx, admin)
+	if e != nil {
+		t.Fatal(e)
+	}
+	raw, _ := json.Marshal(before)
+	if strings.Contains(string(raw), "no_fix_published") {
+		t.Fatal(string(raw))
+	}
+	now = now.Add(2 * time.Hour)
+	after, e := s.Attention(ctx, admin)
+	if e != nil {
+		t.Fatal(e)
+	}
+	raw, _ = json.Marshal(after)
+	if !strings.Contains(string(raw), "no_fix_published") {
+		t.Fatal("suppression expiry hidden", string(raw))
 	}
 }

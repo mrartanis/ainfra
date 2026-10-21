@@ -75,7 +75,22 @@ func (s *Store) Search(ctx context.Context, q string, literal bool, limit, offse
 			rows, _ := t.List(k)
 			for _, r := range rows {
 				if strings.Contains(strings.ToLower(string(r)), strings.ToLower(q)) {
-					out = append(out, r)
+					var value map[string]any
+					if e := json.Unmarshal(r, &value); e != nil {
+						return e
+					}
+					title := value["title"]
+					url := "/docs/"
+					if k == "node" {
+						title = value["name"]
+						url = "/nodes/"
+					}
+					snippet := string(r)
+					if len(snippet) > 240 {
+						snippet = snippet[:240]
+					}
+					b, _ := json.Marshal(map[string]any{"kind": k, "id": value["id"], "title": title, "revision": value["revision"], "url": url + fmt.Sprint(value["id"]), "snippet": snippet})
+					out = append(out, b)
 				}
 			}
 		}
@@ -89,4 +104,29 @@ func (s *Store) Search(ctx context.Context, q string, literal bool, limit, offse
 		out = out[:limit]
 	}
 	return
+}
+
+func (t tx) ListNode(kind, node string) ([]json.RawMessage, error) {
+	rows, e := t.List(kind)
+	if e != nil {
+		return nil, e
+	}
+	out := []json.RawMessage{}
+	for _, raw := range rows {
+		var v struct {
+			NodeID string `json:"node_id"`
+		}
+		if e = json.Unmarshal(raw, &v); e != nil {
+			return nil, e
+		}
+		if v.NodeID == node {
+			out = append(out, raw)
+		}
+	}
+	return out, nil
+}
+
+func (s *Store) CountSearch(ctx context.Context, q string, literal bool) (int, error) {
+	rows, e := s.Search(ctx, q, literal, int(^uint(0)>>1), 0)
+	return len(rows), e
 }

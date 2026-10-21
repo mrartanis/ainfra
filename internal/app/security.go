@@ -187,7 +187,13 @@ func (s *Service) Findings(ctx context.Context, p domain.Principal, node string)
 	}
 	out = []domain.Finding{}
 	err = s.store.Read(ctx, func(tx Tx) error {
-		fs, e := decodeList[domain.Finding](tx, "finding")
+		var fs []domain.Finding
+		var e error
+		if node == "" {
+			fs, e = decodeList[domain.Finding](tx, "finding")
+		} else {
+			fs, e = decodeNodeList[domain.Finding](tx, "finding", node)
+		}
 		if e != nil {
 			return e
 		}
@@ -288,7 +294,7 @@ func (s *Service) reassess(tx Tx, n domain.Node) error {
 			}
 		}
 	}
-	old, e := decodeList[domain.Finding](tx, "finding")
+	old, e := decodeNodeList[domain.Finding](tx, "finding", n.ID)
 	if e != nil {
 		return e
 	}
@@ -310,7 +316,7 @@ func (s *Service) reassess(tx Tx, n domain.Node) error {
 			return e
 		}
 	}
-	return nil
+	return refreshFindingSummary(tx, n.ID)
 }
 func (s *Service) Suppress(ctx context.Context, p domain.Principal, id, reason string, until time.Time) error {
 	if p.Role != "admin" {
@@ -328,6 +334,9 @@ func (s *Service) Suppress(ctx context.Context, p domain.Principal, id, reason s
 		f.Reason = reason
 		f.SuppressedUntil = until
 		if e := tx.Put("finding", id, f); e != nil {
+			return e
+		}
+		if e := refreshFindingSummary(tx, f.NodeID); e != nil {
 			return e
 		}
 		return s.event(tx, p, "finding.suppressed", id, reason)

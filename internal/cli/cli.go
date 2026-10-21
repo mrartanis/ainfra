@@ -9,7 +9,6 @@ import (
 	"io"
 	"net/url"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -25,6 +24,7 @@ const Help = `infractl — клиент HTTP API Infra
   tokens revoke ID | feeds status | events | me
   context NODE [--format markdown] | export --output NEW_DIRECTORY
   request METHOD API_PATH [--file JSON] [--if-revision N]
+  --limit N --offset N: страница списка; --page-info: данные с метаданными страницы.
   --json: машинный JSON; --config: JSON с endpoint, token_file, ca_file.
   Формат docs put: JSON {id?, title, kind, body, nodes?}; без id создаёт документ.
 `
@@ -37,7 +37,7 @@ func Run(ctx context.Context, c *apiclient.Client, args []string, out io.Writer)
 		if strings.HasPrefix(a, "--") {
 			k := strings.TrimPrefix(a, "--")
 			switch k {
-			case "json", "literal", "upgradable", "help":
+			case "json", "literal", "upgradable", "help", "page-info":
 				opts[k] = "true"
 			default:
 				if i+1 >= len(args) {
@@ -154,11 +154,7 @@ func Run(ctx context.Context, c *apiclient.Client, args []string, out io.Writer)
 		_, e = io.WriteString(out, text)
 		return e
 	case "export":
-		var data map[string]json.RawMessage
-		if e = c.Do(ctx, "GET", "export", nil, &data, 0); e != nil {
-			return e
-		}
-		return export(opts["output"], data)
+		return exportAPI(ctx, c, opts["output"])
 	case "request":
 		method = at(1)
 		path = at(2)
@@ -166,8 +162,23 @@ func Run(ctx context.Context, c *apiclient.Client, args []string, out io.Writer)
 	if path == "" || strings.Contains(path, "..") || strings.Contains(path, "://") {
 		return errors.New("invalid command; use --help")
 	}
+	if method == "GET" {
+		u, err := url.Parse(path)
+		if err != nil {
+			return err
+		}
+		q := u.Query()
+		for _, key := range []string{"limit", "offset"} {
+			if opts[key] != "" {
+				q.Set(key, opts[key])
+			}
+		}
+		u.RawQuery = q.Encode()
+		path = u.String()
+	}
 	var result any
-	if e = c.Do(ctx, method, path, input, &result, rev); e != nil {
+	var page apiclient.Page
+	if e = c.Do(ctx, method, path, input, &result, rev, &page); e != nil {
 		return e
 	}
 	if pos[0] == "tokens" && at(1) == "issue" {
@@ -193,80 +204,10 @@ func Run(ctx context.Context, c *apiclient.Client, args []string, out io.Writer)
 		}
 		result = m["token"]
 	}
+	if opts["page-info"] == "true" {
+		result = map[string]any{"items": result, "pagination": page}
+	}
 	enc := json.NewEncoder(out)
 	enc.SetIndent("", "  ")
 	return enc.Encode(result)
-}
-func export(target string, data map[string]json.RawMessage) error {
-	if target == "" {
-		return errors.New("--output required")
-	}
-	if _, e := os.Stat(target); !os.IsNotExist(e) {
-		return errors.New("export destination exists")
-	}
-	if e := os.MkdirAll(filepath.Dir(target), 0700); e != nil {
-		return e
-	}
-	tmp, e := os.MkdirTemp(filepath.Dir(target), ".infra-export-")
-	if e != nil {
-		return e
-	}
-	defer os.RemoveAll(tmp)
-	write := func(path string, b []byte) error {
-		p := filepath.Join(tmp, path)
-		if e := os.MkdirAll(filepath.Dir(p), 0700); e != nil {
-			return e
-		}
-		return os.WriteFile(p, b, 0600)
-	}
-	safe := func(s string) bool { return s != "" && s != "." && s != ".." && !strings.ContainsAny(s, "/\\") }
-	var nodes []map[string]any
-	if e = json.Unmarshal(data["nodes"], &nodes); e != nil {
-		return e
-	}
-	for _, n := range nodes {
-		id, _ := n["slug"].(string)
-		if !safe(id) {
-			return errors.New("unsafe node slug")
-		}
-		b, _ := json.MarshalIndent(n, "", "  ")
-		if e = write("nodes/"+id+"/node.json", b); e != nil {
-			return e
-		}
-	}
-	var docs []struct {
-		ID    string `json:"id"`
-		Body  string `json:"body"`
-		Title string `json:"title"`
-	}
-	if e = json.Unmarshal(data["documents"], &docs); e != nil {
-		return e
-	}
-	for _, d := range docs {
-		if !safe(d.ID) {
-			return errors.New("unsafe document ID")
-		}
-		if e = write("documents/"+d.ID+".md", []byte("# "+d.Title+"\n\n"+d.Body)); e != nil {
-			return e
-		}
-	}
-	var events []json.RawMessage
-	if e = json.Unmarshal(data["events"], &events); e != nil {
-		return e
-	}
-	var b strings.Builder
-	for _, v := range events {
-		b.Write(v)
-		b.WriteByte('\n')
-	}
-	if e = write("history/events.jsonl", []byte(b.String())); e != nil {
-		return e
-	}
-	if e = write("relations.json", data["relations"]); e != nil {
-		return e
-	}
-	if e = write("manifest.json", []byte(`{"schema_version":1,"contains_secrets":false,"restore_requires_database_backup":true}`)); e != nil {
-		return e
-	}
-	return os.Rename(tmp, target)
 }

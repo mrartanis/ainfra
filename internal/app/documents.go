@@ -41,7 +41,10 @@ func (s *Service) EditDocument(ctx context.Context, p domain.Principal, d domain
 		d.ApprovedHash = ""
 		d.Approver = ""
 		d.NeedsRevalidation = false
-		d.EvidenceHash = evidence(tx, d.Nodes)
+		d.EvidenceHash = ""
+		if d.Kind == "maintenance_plan" {
+			d.EvidenceHash = evidence(tx, d.Nodes)
+		}
 		if e := tx.Put("document", d.ID, d); e != nil {
 			return e
 		}
@@ -140,4 +143,14 @@ func (s *Service) Events(ctx context.Context, p domain.Principal) (out []domain.
 	}
 	err = s.store.Read(ctx, func(tx Tx) error { var e error; out, e = decodeList[domain.Event](tx, "event"); return e })
 	return
+}
+
+func (s *Service) SearchCount(ctx context.Context, p domain.Principal, q string, literal bool) (int, error) {
+	if !reader(p) {
+		return 0, ErrForbidden
+	}
+	if len(q) > 300 {
+		return 0, ErrInvalid
+	}
+	return s.store.CountSearch(ctx, q, literal)
 }

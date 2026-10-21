@@ -17,11 +17,13 @@ type Tx interface {
 	Put(kind, id string, value any) error
 	Delete(kind, id string) error
 	List(kind string) ([]json.RawMessage, error)
+	ListNode(kind, node string) ([]json.RawMessage, error)
 }
 type Store interface {
 	Read(context.Context, func(Tx) error) error
 	Write(context.Context, func(Tx) error) error
 	Search(context.Context, string, bool, int, int) ([]json.RawMessage, error)
+	CountSearch(context.Context, string, bool) (int, error)
 }
 type Service struct {
 	store Store
@@ -50,4 +52,20 @@ func decodeList[T any](tx Tx, kind string) ([]T, error) {
 
 func (s *Service) Ready(ctx context.Context) error {
 	return s.store.Read(ctx, func(tx Tx) error { _, e := tx.List("settings"); return e })
+}
+
+func decodeNodeList[T any](tx Tx, kind, node string) ([]T, error) {
+	rows, e := tx.ListNode(kind, node)
+	if e != nil {
+		return nil, e
+	}
+	out := make([]T, 0, len(rows))
+	for _, raw := range rows {
+		var v T
+		if e = json.Unmarshal(raw, &v); e != nil {
+			return nil, e
+		}
+		out = append(out, v)
+	}
+	return out, nil
 }

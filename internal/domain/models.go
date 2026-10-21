@@ -146,6 +146,9 @@ type Package struct {
 	BlockedReason          string `json:"blocked_reason"`
 }
 type PackageData struct {
+	PackageCount   int       `json:"package_count"`
+	UnknownOrigins int       `json:"unknown_origins"`
+	Updates        int       `json:"updates"`
 	Packages       []Package `json:"packages"`
 	MetadataStatus string    `json:"metadata_status"`
 	Simulation     string    `json:"simulation"`
@@ -203,6 +206,8 @@ type Finding struct {
 	FeedAt          time.Time `json:"feed_at"`
 }
 type Attention struct {
+	Purpose    string    `json:"purpose"`
+	Addresses  []string  `json:"addresses"`
 	NodeID     string    `json:"node_id"`
 	Name       string    `json:"name"`
 	Reasons    []string  `json:"reasons"`

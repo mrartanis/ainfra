@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -71,7 +72,7 @@ func ReadSecret(path string) (string, error) {
 	b, e := io.ReadAll(f)
 	return strings.TrimSpace(string(b)), e
 }
-func (c *Client) Do(ctx context.Context, method, path string, in, out any, revision int) error {
+func (c *Client) Do(ctx context.Context, method, path string, in, out any, revision int, page ...*Page) error {
 	b := []byte(nil)
 	var e error
 	if in != nil {
@@ -94,6 +95,16 @@ func (c *Client) Do(ctx context.Context, method, path string, in, out any, revis
 		return fmt.Errorf("API connection failed")
 	}
 	defer resp.Body.Close()
+	if len(page) > 0 && page[0] != nil {
+		p := page[0]
+		p.NextOffset = -1
+		p.Total, _ = strconv.Atoi(resp.Header.Get("X-Total-Count"))
+		p.Limit, _ = strconv.Atoi(resp.Header.Get("X-Page-Limit"))
+		p.Offset, _ = strconv.Atoi(resp.Header.Get("X-Page-Offset"))
+		if raw := resp.Header.Get("X-Next-Offset"); raw != "" {
+			p.NextOffset, _ = strconv.Atoi(raw)
+		}
+	}
 	data, e := io.ReadAll(io.LimitReader(resp.Body, 32<<20))
 	if e != nil {
 		return fmt.Errorf("API read failed")
@@ -109,4 +120,42 @@ func (c *Client) Do(ctx context.Context, method, path string, in, out any, revis
 		return nil
 	}
 	return json.Unmarshal(data, out)
+}
+
+type Page struct {
+	Total      int `json:"total"`
+	Limit      int `json:"limit"`
+	Offset     int `json:"offset"`
+	NextOffset int `json:"next_offset"`
+}
+
+func (c *Client) ForEach(ctx context.Context, path string, visit func(json.RawMessage) error) error {
+	u, e := url.Parse(path)
+	if e != nil {
+		return e
+	}
+	offset := 0
+	for {
+		q := u.Query()
+		q.Set("offset", strconv.Itoa(offset))
+		q.Set("limit", "100")
+		u.RawQuery = q.Encode()
+		var rows []json.RawMessage
+		var page Page
+		if e = c.Do(ctx, "GET", u.String(), nil, &rows, 0, &page); e != nil {
+			return e
+		}
+		for _, row := range rows {
+			if e = visit(row); e != nil {
+				return e
+			}
+		}
+		if page.NextOffset < 0 {
+			return nil
+		}
+		if page.NextOffset <= offset {
+			return fmt.Errorf("API returned invalid pagination")
+		}
+		offset = page.NextOffset
+	}
 }

@@ -113,7 +113,7 @@ func (s *Service) IngestReport(ctx context.Context, p domain.Principal, r domain
 				}
 			}
 		}
-		if e = tx.Put("node", n.ID, n); e != nil {
+		if e = putNode(tx, n); e != nil {
 			return e
 		}
 		return s.reassess(tx, n)
@@ -167,7 +167,7 @@ func (s *Service) SaveNode(ctx context.Context, p domain.Principal, n domain.Nod
 		if !contains([]string{"physical", "vm", "router", "other"}, n.Kind) || !contains([]string{"active", "retired"}, n.Lifecycle) || !contains([]string{"low", "normal", "high"}, n.Criticality) {
 			return ErrInvalid
 		}
-		if e := tx.Put("node", n.ID, n); e != nil {
+		if e := putNode(tx, n); e != nil {
 			return e
 		}
 		out = n
@@ -186,6 +186,6 @@ func (s *Service) Nodes(ctx context.Context, p domain.Principal) (out []domain.N
 	if !reader(p) {
 		return nil, ErrForbidden
 	}
-	err = s.store.Read(ctx, func(tx Tx) error { var e error; out, e = decodeList[domain.Node](tx, "node"); return e })
+	err = s.store.Read(ctx, func(tx Tx) error { var e error; out, e = decodeList[domain.Node](tx, "node-summary"); return e })
 	return
 }

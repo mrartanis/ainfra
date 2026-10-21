@@ -3,11 +3,15 @@ package sqlite_test
 import (
 	"ainfra/internal/adapters/sqlite"
 	"ainfra/internal/app"
+	"ainfra/internal/domain"
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 )
 
 func TestPersistenceRollbackFTSBackup(t *testing.T) {
@@ -91,5 +95,59 @@ func TestUpgradeIndexesExistingDocuments(t *testing.T) {
 	rows, e := s.Search(context.Background(), "Recovery", false, 10, 0)
 	if e != nil || len(rows) != 1 {
 		t.Fatal(rows, e)
+	}
+}
+
+func TestUpgradeV1MaterializesCompactNodeList(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "v1.db")
+	db, e := sql.Open("sqlite", path)
+	if e != nil {
+		t.Fatal(e)
+	}
+	_, e = db.Exec(`CREATE TABLE schema_migrations(version INTEGER PRIMARY KEY); INSERT INTO schema_migrations VALUES(1); CREATE TABLE records(kind TEXT NOT NULL,id TEXT NOT NULL,body TEXT NOT NULL,PRIMARY KEY(kind,id)); PRAGMA user_version=1; INSERT INTO records VALUES('node','n','{"id":"n","name":"old","observations":{"packages":{"status":"ok","complete":true,"observed_at":"2026-10-21T00:00:00Z","data":{"packages":[{"name":"a","version":"1","candidate":"2"}]}}}}')`)
+	if e != nil {
+		t.Fatal(e)
+	}
+	db.Close()
+	s, e := sqlite.Open(path)
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer s.Close()
+	svc := app.New(s, time.Now, app.RandomID)
+	nodes, e := svc.Nodes(context.Background(), domain.Principal{Role: "reader"})
+	if e != nil || len(nodes) != 1 {
+		t.Fatal(nodes, e)
+	}
+	var data domain.PackageData
+	if e = json.Unmarshal(nodes[0].Observations["packages"].Data, &data); e != nil || data.PackageCount != 1 || data.Updates != 1 || len(data.Packages) != 0 {
+		t.Fatal(data, e)
+	}
+}
+
+func TestSearchResultsAreBoundedAndCounted(t *testing.T) {
+	s, e := sqlite.Open(filepath.Join(t.TempDir(), "search.db"))
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer s.Close()
+	ctx := context.Background()
+	if e = s.Write(ctx, func(tx app.Tx) error {
+		for _, id := range []string{"a", "b", "c"} {
+			if e := tx.Put("document", id, map[string]any{"id": id, "title": "Recovery guide", "body": strings.Repeat("backup ", 10000), "revision": 1}); e != nil {
+				return e
+			}
+		}
+		return nil
+	}); e != nil {
+		t.Fatal(e)
+	}
+	rows, e := s.Search(ctx, "backup", false, 1, 1)
+	if e != nil || len(rows) != 1 || len(rows[0]) > 2048 {
+		t.Fatal(len(rows), e)
+	}
+	count, e := s.CountSearch(ctx, "backup", false)
+	if e != nil || count != 3 {
+		t.Fatal(count, e)
 	}
 }

@@ -113,6 +113,11 @@ func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	status := 200
 	revision, _ := strconv.Atoi(strings.Trim(r.Header.Get("If-Match"), `"`))
 	read := r.Method == "GET"
+	paging, err := parsePagination(r)
+	if err != nil {
+		failure(w, err)
+		return
+	}
 	id := ""
 	if len(parts) > 1 {
 		id = parts[1]
@@ -181,7 +186,7 @@ func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		e = a.s.Reenroll(ctx, p, id, v.Instance, revision)
 		out = map[string]bool{"ok": e == nil}
 	case path == "attention" && read:
-		out, e = a.s.Attention(ctx, p)
+		out, e = a.s.QueryAttention(ctx, p, r.URL.Query().Get("filter"), r.URL.Query().Get("sort"))
 	case path == "findings" && read:
 		out, e = a.s.Findings(ctx, p, r.URL.Query().Get("node"))
 	case parts[0] == "findings" && len(parts) == 3 && parts[2] == "suppress" && r.Method == "POST":
@@ -197,12 +202,25 @@ func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case path == "feed-status" && read:
 		out, e = a.s.Feeds(ctx, p)
 	case path == "search" && read:
-		limit := 50
-		if v := r.URL.Query().Get("limit"); v != "" {
-			limit, _ = strconv.Atoi(v)
+		query := r.URL.Query().Get("q")
+		literal := r.URL.Query().Get("literal") == "true"
+		limit := paging.limit
+		if limit > 100 {
+			limit = 100
 		}
-		offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
-		out, e = a.s.Search(ctx, p, r.URL.Query().Get("q"), r.URL.Query().Get("literal") == "true", limit, offset)
+		out, e = a.s.Search(ctx, p, query, literal, limit, paging.offset)
+		if e == nil {
+			var total int
+			total, e = a.s.SearchCount(ctx, p, query, literal)
+			if e == nil {
+				w.Header().Set("X-Total-Count", strconv.Itoa(total))
+				w.Header().Set("X-Page-Limit", strconv.Itoa(limit))
+				w.Header().Set("X-Page-Offset", strconv.Itoa(paging.offset))
+				if paging.offset+limit < total {
+					w.Header().Set("X-Next-Offset", strconv.Itoa(paging.offset+limit))
+				}
+			}
+		}
 	case path == "documents" && read:
 		out, e = a.s.Documents(ctx, p)
 	case path == "documents" && r.Method == "POST":
@@ -252,25 +270,7 @@ func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case parts[0] == "tokens" && len(parts) == 2 && r.Method == "DELETE":
 		e = a.s.RevokeToken(ctx, p, id)
 		out = map[string]bool{"ok": e == nil}
-	case path == "export" && read:
-		var nodes []domain.Node
-		nodes, e = a.s.Nodes(ctx, p)
-		if e != nil {
-			break
-		}
-		docs, err := a.s.Documents(ctx, p)
-		if err != nil {
-			e = err
-			break
-		}
-		relations, err := a.s.Relations(ctx, p)
-		if err != nil {
-			e = err
-			break
-		}
-		events, err := a.s.Events(ctx, p)
-		e = err
-		out = map[string]any{"schema_version": 1, "nodes": nodes, "documents": docs, "relations": relations, "events": events}
+
 	default:
 		e = app.ErrNotFound
 	}
@@ -283,6 +283,10 @@ func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("ETag", strconv.Quote(strconv.Itoa(v.Revision)))
 	case domain.Document:
 		w.Header().Set("ETag", strconv.Quote(strconv.Itoa(v.Revision)))
+	}
+	if read {
+		out = filterByNode(out, r.URL.Query().Get("node"))
+		out = paginate(w, paging, out)
 	}
 	write(w, status, out)
 }

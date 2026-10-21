@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -71,4 +72,45 @@ func (brokenStore) Write(context.Context, func(app.Tx) error) error {
 }
 func (brokenStore) Search(context.Context, string, bool, int, int) ([]json.RawMessage, error) {
 	return nil, errors.New("database unavailable")
+}
+
+func TestListPaginationBoundsAndStableOrder(t *testing.T) {
+	s := app.New(testkit.NewStore(), time.Now, testkit.IDs())
+	ctx := context.Background()
+	admin := domain.Principal{Role: "admin"}
+	for i := 0; i < 105; i++ {
+		if _, e := s.SaveNode(ctx, admin, domain.Node{Name: fmt.Sprintf("node-%03d", i)}, 0); e != nil {
+			t.Fatal(e)
+		}
+	}
+	token, _, e := s.IssueToken(ctx, admin, domain.Principal{Role: "reader"})
+	if e != nil {
+		t.Fatal(e)
+	}
+	h := httpapi.New(s)
+	for _, tc := range []struct {
+		query         string
+		status, count int
+	}{{"", 200, 100}, {"?limit=20&offset=100", 200, 5}, {"?limit=1001", 400, 0}, {"?offset=-1", 400, 0}, {"?limit=banana", 400, 0}} {
+		r := httptest.NewRequest("GET", "/api/v1/nodes"+tc.query, nil)
+		r.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		if w.Code != tc.status {
+			t.Fatalf("%s status %d", tc.query, w.Code)
+		}
+		if w.Code == 200 {
+			var rows []domain.Node
+			if e = json.Unmarshal(w.Body.Bytes(), &rows); e != nil || len(rows) != tc.count {
+				t.Fatalf("%s count %d %v", tc.query, len(rows), e)
+			}
+			if w.Header().Get("X-Total-Count") != "105" {
+				t.Fatal(w.Header())
+			}
+		}
+	}
+}
+
+func (brokenStore) CountSearch(context.Context, string, bool) (int, error) {
+	return 0, errors.New("database unavailable")
 }

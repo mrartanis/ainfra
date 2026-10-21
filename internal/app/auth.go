@@ -49,7 +49,7 @@ func (s *Service) IssueToken(ctx context.Context, actor, p domain.Principal) (se
 				return ErrConflict
 			}
 			n.Instance = p.Instance
-			if e := tx.Put("node", id, n); e != nil {
+			if e := putNode(tx, n); e != nil {
 				return e
 			}
 		}
@@ -153,7 +153,7 @@ func (s *Service) Reenroll(ctx context.Context, p domain.Principal, node, instan
 		n.Instance = instance
 		n.Sequence = 0
 		n.Revision++
-		if e := tx.Put("node", node, n); e != nil {
+		if e := putNode(tx, n); e != nil {
 			return e
 		}
 		return s.event(tx, p, "node.reenrolled", node, instance)
