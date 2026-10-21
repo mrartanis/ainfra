@@ -264,6 +264,9 @@ func (s *Service) reassess(tx Tx, n domain.Node) error {
 			f.Remediation = "unknown"
 			for _, p := range group {
 				as, rem := Assess(p, a)
+				if !suiteMatchesRelease(p.Suite, os.Codename) {
+					as, rem = "unknown", "unknown"
+				}
 				if as != "not_affected" {
 					f.Packages = append(f.Packages, p.Name+":"+p.Arch)
 					if f.Assessment == "not_affected" || as == "affected" {
@@ -365,4 +368,16 @@ func setClosureTime(f *domain.Finding, previous domain.Finding, now time.Time) {
 			f.ResolvedAt = now
 		}
 	}
+}
+
+func suiteMatchesRelease(suite, codename string) bool {
+	if codename == "" || suite == "" {
+		return false
+	}
+	for _, suffix := range []string{"", "-security", "-updates", "-infra-security", "-apps-security", "-infra-updates", "-apps-updates"} {
+		if suite == codename+suffix {
+			return true
+		}
+	}
+	return false
 }

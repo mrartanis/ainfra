@@ -3,6 +3,7 @@ package ui
 
 import (
 	"ainfra/internal/apiclient"
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/subtle"
@@ -10,6 +11,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/yuin/goldmark"
 	"html/template"
 	"net"
 	"net/http"
@@ -43,7 +45,7 @@ type UI struct {
 }
 
 func New(base string, client *http.Client, dev bool, now func() time.Time) *UI {
-	funcs := template.FuncMap{"json": func(v any) string { b, _ := json.MarshalIndent(v, "", "  "); return string(b) }, "join": func(v any) string {
+	funcs := template.FuncMap{"markdown": renderMarkdown, "json": func(v any) string { b, _ := json.MarshalIndent(v, "", "  "); return string(b) }, "join": func(v any) string {
 		if ss, ok := v.([]string); ok {
 			return strings.Join(ss, ", ")
 		}
@@ -391,9 +393,14 @@ func (u *UI) mutate(ctx context.Context, c *apiclient.Client, r *http.Request, d
 			return "", e
 		}
 		return "/nodes/" + fmt.Sprint(out["id"]), nil
-	case "/docs/save":
+	case "/docs/save", "/docs/preview":
 		id := f.Get("id")
 		v := map[string]any{"id": id, "title": f.Get("title"), "kind": f.Get("kind"), "body": f.Get("body"), "nodes": split(f.Get("nodes"))}
+		if r.URL.Path == "/docs/preview" {
+			v["revision"] = rev
+			data["Page"], data["Title"], data["Document"], data["Preview"] = "document", "Предпросмотр", v, true
+			return "", nil
+		}
 		method, path := "POST", "documents"
 		if id != "" {
 			method = "PATCH"
@@ -443,4 +450,14 @@ func (u *UI) mutate(ctx context.Context, c *apiclient.Client, r *http.Request, d
 	default:
 		return "", fmt.Errorf("неизвестная операция")
 	}
+}
+
+// Only the default safe renderer may produce trusted template HTML.
+// Raw HTML and dangerous URL schemes are disabled; do not enable WithUnsafe.
+func renderMarkdown(body string) template.HTML {
+	var out bytes.Buffer
+	if err := goldmark.Convert([]byte(body), &out); err != nil {
+		return template.HTML(template.HTMLEscapeString(body))
+	}
+	return template.HTML(out.String())
 }

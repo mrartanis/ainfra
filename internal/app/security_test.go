@@ -144,3 +144,27 @@ func TestRepeatedAssessmentPreservesClosureTime(t *testing.T) {
 		t.Fatalf("reopened finding retains closure: %s", raw)
 	}
 }
+
+func TestMixedReleasePackageIsNotConfidentlyAssessed(t *testing.T) {
+	ctx := context.Background()
+	now := time.Now().UTC()
+	s := app.New(testkit.NewStore(), func() time.Time { return now }, testkit.IDs())
+	admin := domain.Principal{Role: "admin"}
+	n, err := s.SaveNode(ctx, admin, domain.Node{Name: "mixed"}, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := domain.Advisory{ID: "CVE-test", Provider: "debian", Distro: "debian", Release: "bookworm", Source: "openssl", Fixed: "2", Status: "resolved"}
+	if err = s.SyncFeed(ctx, "debian", []domain.Advisory{a}, "", "", nil); err != nil {
+		t.Fatal(err)
+	}
+	data, _ := json.Marshal(domain.PackageData{Packages: []domain.Package{{Name: "ssl", Source: "openssl", SourceVersion: "1", Version: "1", Origin: "Debian", OriginEvidence: "apt-policy", Suite: "trixie"}}})
+	r := domain.Report{SchemaVersion: 1, ID: "report", NodeID: n.ID, Instance: "agent", Sequence: 1, ObservedAt: now, Collectors: map[string]domain.Section{"os": {Status: "ok", Complete: true, ObservedAt: now, Data: json.RawMessage(`{"id":"debian","codename":"bookworm"}`)}, "packages": {Status: "ok", Complete: true, ObservedAt: now, Data: data}}}
+	if _, err = s.IngestReport(ctx, domain.Principal{Role: "agent", Nodes: []string{n.ID}, Instance: "agent"}, r); err != nil {
+		t.Fatal(err)
+	}
+	fs, err := s.Findings(ctx, admin, n.ID)
+	if err != nil || len(fs) != 1 || fs[0].Assessment != "unknown" {
+		t.Fatal(fs, err)
+	}
+}

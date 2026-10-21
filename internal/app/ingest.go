@@ -101,15 +101,17 @@ func (s *Service) IngestReport(ctx context.Context, p domain.Principal, r domain
 			status := v
 			status.Data = nil
 			n.CollectorStatus[k] = status
+			// Each typed check is independently timestamped; a failed sibling
+			// must not hide a valid backup failure or success.
+			if k == "checks" && (v.Status == "ok" || v.Status == "partial") && len(v.Data) > 0 {
+				if e := applyChecks(&n, v.Data); e != nil {
+					return e
+				}
+			}
 			if v.Status == "ok" && v.Complete {
 				old := n.Observations[k]
 				if old.ObservedAt.IsZero() || !v.ObservedAt.Before(old.ObservedAt) {
 					n.Observations[k] = v
-					if k == "checks" {
-						if e := applyChecks(&n, v.Data); e != nil {
-							return e
-						}
-					}
 				}
 			}
 		}
