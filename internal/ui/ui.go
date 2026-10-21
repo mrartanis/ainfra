@@ -434,23 +434,70 @@ func (u *UI) mutate(ctx context.Context, c *apiclient.Client, r *http.Request, d
 	case "/pay":
 		id := f.Get("id")
 		return "/nodes/" + id, c.Do(ctx, "POST", "nodes/"+url.PathEscape(id)+"/pay", nil, nil, rev)
-	case "/services/save", "/backups/save":
+	case "/services/save", "/services/delete", "/backups/save", "/backups/delete":
 		id := f.Get("id")
 		n := map[string]any{}
 		if e := c.Do(ctx, "GET", "nodes/"+url.PathEscape(id), nil, &n, 0); e != nil {
 			return "", e
 		}
-		if r.URL.Path == "/services/save" {
-			rows, _ := n["services"].([]any)
-			rows = append(rows, map[string]any{"name": f.Get("name"), "url": f.Get("url"), "purpose": f.Get("purpose"), "exposure": f.Get("exposure"), "instructions": f.Get("instructions")})
-			n["services"] = rows
-		} else {
-			rows, _ := n["backups"].([]any)
-			interval, _ := strconv.Atoi(f.Get("interval"))
-			rows = append(rows, map[string]any{"id": f.Get("check_id"), "label": f.Get("label"), "destination": f.Get("destination"), "interval_hours": interval, "grace_hours": 2})
-			n["backups"] = rows
+		field := "services"
+		if strings.HasPrefix(r.URL.Path, "/backups/") {
+			field = "backups"
 		}
+		rows, _ := n[field].([]any)
+		entry := map[string]any{}
+		index := -1
+		if f.Get("index") != "" {
+			var err error
+			index, err = strconv.Atoi(f.Get("index"))
+			if err != nil || index < 0 || index >= len(rows) {
+				return "", fmt.Errorf("запись не найдена; обновите карточку")
+			}
+			var ok bool
+			entry, ok = rows[index].(map[string]any)
+			if !ok {
+				return "", fmt.Errorf("неверный формат записи")
+			}
+		}
+		if strings.HasSuffix(r.URL.Path, "/delete") {
+			if index < 0 {
+				return "", fmt.Errorf("запись не выбрана")
+			}
+			rows = append(rows[:index], rows[index+1:]...)
+		} else {
+			if field == "services" {
+				for _, key := range []string{"name", "url", "purpose", "exposure", "instructions"} {
+					entry[key] = f.Get(key)
+				}
+				entry["primary"] = f.Get("primary") == "on"
+			} else {
+				if index >= 0 && entry["id"] != f.Get("check_id") {
+					return "", fmt.Errorf("ID проверки неизменяем; создайте другую запись")
+				}
+				interval, e := strconv.Atoi(f.Get("interval"))
+				if e != nil || interval < 1 {
+					return "", fmt.Errorf("интервал должен быть положительным")
+				}
+				grace := 2
+				if f.Get("grace") != "" {
+					grace, e = strconv.Atoi(f.Get("grace"))
+					if e != nil || grace < 0 {
+						return "", fmt.Errorf("допуск должен быть неотрицательным")
+					}
+				}
+				entry["id"], entry["label"], entry["destination"] = f.Get("check_id"), f.Get("label"), f.Get("destination")
+				entry["interval_hours"], entry["grace_hours"] = interval, grace
+			}
+			if index < 0 {
+				rows = append(rows, entry)
+			} else {
+				rows[index] = entry
+			}
+		}
+		n[field] = rows
 		return "/nodes/" + id, c.Do(ctx, "PATCH", "nodes/"+url.PathEscape(id), n, nil, rev)
+	case "/relations/delete":
+		return "/nodes/" + f.Get("node"), c.Do(ctx, "DELETE", "relations/"+url.PathEscape(f.Get("id")), nil, nil, 0)
 	default:
 		return "", fmt.Errorf("неизвестная операция")
 	}

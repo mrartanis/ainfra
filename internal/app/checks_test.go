@@ -27,6 +27,13 @@ func TestBackupCheckPreservesSuccessfulCopyButExposesFailure(t *testing.T) {
 	if _, e = s.IngestReport(ctx, p, r); e != nil {
 		t.Fatal(e)
 	}
+	// The form was opened before the report. Saving its manual description
+	// must preserve the newer check result, despite the unchanged manual revision.
+	n.Backups[0].Label = "edited description"
+	n, e = s.SaveNode(ctx, admin, n, n.Revision)
+	if e != nil {
+		t.Fatal(e)
+	}
 	n, e = s.Node(ctx, admin, n.ID)
 	if e != nil || !n.Backups[0].LastSuccess.Equal(last) || n.Backups[0].LastAttemptStatus != "error" {
 		t.Fatal(n.Backups, e)

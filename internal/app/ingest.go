@@ -172,6 +172,21 @@ func (s *Service) SaveNode(ctx context.Context, p domain.Principal, n domain.Nod
 			}
 			n.Revision = old.Revision + 1
 			n.Slug = old.Slug
+			// A manual form may predate a collector update: report ingestion does
+			// not change the manual revision. Retain newer observed backup facts.
+			previousBackups := make(map[string]domain.Backup, len(old.Backups))
+			for _, b := range old.Backups {
+				previousBackups[b.ID] = b
+			}
+			for i := range n.Backups {
+				b := &n.Backups[i]
+				if observed, ok := previousBackups[b.ID]; ok && observed.ObservedAt.After(b.ObservedAt) {
+					b.ObservedAt = observed.ObservedAt
+					b.LastAttempt, b.LastAttemptStatus = observed.LastAttempt, observed.LastAttemptStatus
+					b.LastSuccess, b.LastRestoreTest = observed.LastSuccess, observed.LastRestoreTest
+					b.Evidence = observed.Evidence
+				}
+			}
 			n.Observations = old.Observations
 			n.CollectorStatus = old.CollectorStatus
 			n.LastReport = old.LastReport
