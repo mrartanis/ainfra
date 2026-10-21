@@ -2,6 +2,7 @@ package agent
 
 import (
 	"ainfra/internal/apiclient"
+	"ainfra/internal/app"
 	"ainfra/internal/domain"
 	"context"
 	"encoding/json"
@@ -243,6 +244,10 @@ func (a *Agent) checks() domain.Section {
 		d := json.NewDecoder(strings.NewReader(string(b)))
 		d.DisallowUnknownFields()
 		if d.Decode(&check) != nil || check.SchemaVersion != 1 || check.ID == "" || check.ObservedAt.IsZero() || check.ObservedAt.After(a.now().Add(5*time.Minute)) || (check.Kind != "backup" && check.Kind != "payment") || (check.Status != "ok" && check.Status != "error") {
+			partial = true
+			continue
+		}
+		if app.ValidateChecks(append(append([]byte{'['}, b...), ']')) != nil {
 			partial = true
 			continue
 		}

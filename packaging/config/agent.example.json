@@ -1,0 +1,11 @@
+{
+  "node_id": "REPLACE_WITH_NODE_UUID",
+  "agent_instance_id": "REPLACE_WITH_NEW_INSTANCE_UUID",
+  "server_url": "https://infra.example.org",
+  "token_file": "/etc/infra/agent.token",
+  "ca_file": "",
+  "state_dir": "/var/lib/infra-agent",
+  "collectors": ["os", "packages", "network"],
+  "check_files": [],
+  "probe_targets": []
+}

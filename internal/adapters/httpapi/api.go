@@ -161,6 +161,15 @@ func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	case parts[0] == "nodes" && len(parts) == 3 && parts[2] == "pay" && r.Method == "POST":
 		out, e = a.s.Pay(ctx, p, id, revision)
+	case parts[0] == "nodes" && len(parts) == 3 && parts[2] == "reenroll" && r.Method == "POST":
+		var v struct {
+			Instance string `json:"agent_instance_id"`
+		}
+		if !body(&v) {
+			return
+		}
+		e = a.s.Reenroll(ctx, p, id, v.Instance, revision)
+		out = map[string]bool{"ok": e == nil}
 	case path == "attention" && read:
 		out, e = a.s.Attention(ctx, p)
 	case path == "findings" && read:

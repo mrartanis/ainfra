@@ -2,6 +2,7 @@ package app
 
 import (
 	"ainfra/internal/domain"
+	"ainfra/internal/domain/version"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -185,11 +186,49 @@ func (s *Service) Attention(ctx context.Context, p domain.Principal) (out []doma
 				a.Reasons = append(a.Reasons, "Бэкап "+b.Label+": восстановление не проверено")
 			}
 		}
-		fs, _ := s.Findings(ctx, p, n.ID)
+		var os domain.OSData
+		_ = json.Unmarshal(n.Observations["os"].Data, &os)
+		covered := false
+		for _, feed := range feeds {
+			if feed.ID == os.ID && !feed.LastSuccess.IsZero() {
+				covered = true
+			}
+		}
+		if !covered {
+			a.Reasons = append(a.Reasons, "CVE: нет покрытия для ОС "+os.ID)
+		}
+		var pd domain.PackageData
+		_ = json.Unmarshal(pk.Data, &pd)
+		if pd.MetadataStatus != "fresh" {
+			a.Reasons = append(a.Reasons, "APT: свежесть метаданных не подтверждена")
+		}
+		unknown, updates := 0, 0
+		for _, pkg := range pd.Packages {
+			if pkg.Origin == "" || pkg.SourceVersion == "" {
+				unknown++
+			}
+			if cmp, err := version.Compare(pkg.Candidate, pkg.Version); err == nil && cmp > 0 {
+				updates++
+			}
+		}
+		if unknown > 0 {
+			a.Reasons = append(a.Reasons, fmt.Sprintf("Пакеты: неизвестное происхождение у %d", unknown))
+		}
+		if updates > 0 {
+			a.Reasons = append(a.Reasons, fmt.Sprintf("Обычные обновления: %d", updates))
+		}
+		fs, err := s.Findings(ctx, p, n.ID)
+		if err != nil {
+			return nil, err
+		}
+		findingCounts := map[string]int{}
 		for _, f := range fs {
 			if f.Workflow != "resolved" && !(f.Workflow == "suppressed" && f.SuppressedUntil.After(s.now())) {
-				a.Reasons = append(a.Reasons, f.Advisory.ID+": "+f.Assessment+" / "+f.Remediation)
+				findingCounts[f.Assessment+" / "+f.Remediation]++
 			}
+		}
+		for status, count := range findingCounts {
+			a.Reasons = append(a.Reasons, fmt.Sprintf("CVE: %d — %s", count, status))
 		}
 		sort.Strings(a.Reasons)
 		out = append(out, a)
@@ -219,7 +258,7 @@ func (s *Service) Packages(ctx context.Context, p domain.Principal, id string, u
 	if upgradable {
 		ps := []domain.Package{}
 		for _, pkg := range data.Packages {
-			if pkg.Candidate != "" && pkg.Candidate != pkg.Version {
+			if cmp, err := version.Compare(pkg.Candidate, pkg.Version); err == nil && cmp > 0 {
 				ps = append(ps, pkg)
 			}
 		}

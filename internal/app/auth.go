@@ -118,3 +118,44 @@ func (s *Service) RevokeToken(ctx context.Context, p domain.Principal, id string
 		return s.event(tx, p, "token.revoked", id, "")
 	})
 }
+
+func (s *Service) Reenroll(ctx context.Context, p domain.Principal, node, instance string, revision int) error {
+	if p.Role != "admin" {
+		return ErrForbidden
+	}
+	if instance == "" || len(instance) > 100 {
+		return ErrInvalid
+	}
+	return s.store.Write(ctx, func(tx Tx) error {
+		var n domain.Node
+		if e := tx.Get("node", node, &n); e != nil {
+			return e
+		}
+		if n.Revision != revision {
+			return ErrConflict
+		}
+		keys := map[string]string{}
+		if e := tx.Get("token-index", "all", &keys); e != nil && e != ErrNotFound {
+			return e
+		}
+		for _, key := range keys {
+			var token domain.Token
+			if e := tx.Get("token", key, &token); e != nil {
+				return e
+			}
+			if contains(token.Principal.Nodes, node) {
+				token.Revoked = true
+				if e := tx.Put("token", key, token); e != nil {
+					return e
+				}
+			}
+		}
+		n.Instance = instance
+		n.Sequence = 0
+		n.Revision++
+		if e := tx.Put("node", node, n); e != nil {
+			return e
+		}
+		return s.event(tx, p, "node.reenrolled", node, instance)
+	})
+}

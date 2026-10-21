@@ -58,3 +58,24 @@ func TestTokenScopesAndRevocation(t *testing.T) {
 		t.Fatal(e)
 	}
 }
+
+func TestReenrollRevokesOldAgent(t *testing.T) {
+	s := app.New(testkit.NewStore(), time.Now, testkit.IDs())
+	ctx := context.Background()
+	admin := domain.Principal{Role: "admin"}
+	n, _ := s.SaveNode(ctx, admin, domain.Node{Name: "n"}, 0)
+	old, _, e := s.IssueToken(ctx, admin, domain.Principal{Role: "agent", Nodes: []string{n.ID}, Instance: "old"})
+	if e != nil {
+		t.Fatal(e)
+	}
+	if e = s.Reenroll(ctx, admin, n.ID, "new", n.Revision); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = s.Authenticate(ctx, old); !errors.Is(e, app.ErrForbidden) {
+		t.Fatal("old token still active")
+	}
+	n, _ = s.Node(ctx, admin, n.ID)
+	if n.Instance != "new" || n.Sequence != 0 {
+		t.Fatal(n)
+	}
+}

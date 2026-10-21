@@ -174,11 +174,19 @@ func syncFeeds(ctx context.Context, svc *app.Service) error {
 				prev = f
 			}
 		}
-		snapshot, err := source.Fetch(ctx, prev)
+		stage, err := feeds.NewStage("")
+		if err != nil {
+			return err
+		}
+		snapshot, err := source.FetchTo(ctx, prev, stage.Emit)
 		if snapshot.Unchanged && err == nil {
 			err = svc.FeedUnchanged(ctx, source.ID)
 		} else {
-			err = svc.SyncFeed(ctx, source.ID, snapshot.Records, snapshot.ETag, snapshot.Modified, err)
+			err = svc.SyncSnapshot(ctx, source.ID, stage, snapshot.ETag, snapshot.Modified, err)
+		}
+		closeErr := stage.Close()
+		if err == nil {
+			err = closeErr
 		}
 		if err != nil {
 			result = err

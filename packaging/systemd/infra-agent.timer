@@ -1,0 +1,9 @@
+[Unit]
+Description=Hourly Infra inventory report
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=1h
+RandomizedDelaySec=10min
+Persistent=true
+[Install]
+WantedBy=timers.target

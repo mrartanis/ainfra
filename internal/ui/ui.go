@@ -14,6 +14,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -44,6 +45,9 @@ type UI struct {
 
 func New(base string, client *http.Client, dev bool, now func() time.Time) *UI {
 	funcs := template.FuncMap{"json": func(v any) string { b, _ := json.MarshalIndent(v, "", "  "); return string(b) }, "join": func(v any) string {
+		if ss, ok := v.([]string); ok {
+			return strings.Join(ss, ", ")
+		}
 		a, ok := v.([]any)
 		if !ok {
 			return ""
@@ -231,6 +235,22 @@ func (u *UI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		data["Filter"] = r.URL.Query().Get("filter")
 		data["Sort"] = r.URL.Query().Get("sort")
+		rows, _ := data["Attention"].([]any)
+		filtered := []any{}
+		for _, row := range rows {
+			m := row.(map[string]any)
+			observed, _ := time.Parse(time.RFC3339Nano, fmt.Sprint(m["last_report"]))
+			if data["Filter"] == "stale" && !observed.IsZero() && u.now().Sub(observed) <= 2*time.Hour {
+				continue
+			}
+			filtered = append(filtered, row)
+		}
+		if data["Sort"] == "name" {
+			sort.Slice(filtered, func(i, j int) bool {
+				return fmt.Sprint(filtered[i].(map[string]any)["name"]) < fmt.Sprint(filtered[j].(map[string]any)["name"])
+			})
+		}
+		data["Attention"] = filtered
 	case path == "/nodes/new":
 		data["Page"] = "node-edit"
 		data["Title"] = "Добавить узел"

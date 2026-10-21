@@ -36,3 +36,10 @@ func TestUbuntuAmbiguityAndPro(t *testing.T) {
 		t.Fatal(ads, e)
 	}
 }
+
+func TestUSNUsesUpstreamIdentityWithoutClaimingApplicability(t *testing.T) {
+	ads, e := feeds.Ubuntu([]byte(`{"id":"USN-1-1","upstream":["UBUNTU-CVE-2026-1"],"affected":[{"package":{"name":"foo","ecosystem":"Ubuntu:24.04:LTS"},"ranges":[{"type":"ECOSYSTEM","events":[{"introduced":"0"},{"fixed":"2"}]}]}]}`))
+	if e != nil || len(ads) != 1 || ads[0].ID != "CVE-2026-1" || ads[0].Status != "notice_only" {
+		t.Fatal(ads, e)
+	}
+}

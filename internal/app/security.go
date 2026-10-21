@@ -12,6 +12,9 @@ import (
 )
 
 func Assess(p domain.Package, a domain.Advisory) (string, string) {
+	if a.Status == "notice_only" {
+		return "unknown", "unknown"
+	}
 	official := a.Distro == "debian" && p.Origin == "Debian" || a.Distro == "ubuntu" && p.Origin == "Ubuntu"
 	if !official || p.OriginEvidence == "" || strings.Contains(p.Suite, "backports") || strings.Contains(p.Version, "~bpo") || p.SourceVersion == "" {
 		return "unknown", "unknown"
@@ -53,9 +56,32 @@ func Assess(p domain.Package, a domain.Advisory) (string, string) {
 	}
 	return "affected", rem
 }
+
+// AdvisorySnapshot is a validated staging source. Walk must be repeatable and
+// report read failures, so publication can roll back atomically.
+type AdvisorySnapshot interface {
+	Walk(func(string, []domain.Advisory) error) error
+}
+type sliceSnapshot []domain.Advisory
+
+func (records sliceSnapshot) Walk(visit func(string, []domain.Advisory) error) error {
+	groups := map[string][]domain.Advisory{}
+	for _, a := range records {
+		groups[a.Source] = append(groups[a.Source], a)
+	}
+	for source, ads := range groups {
+		if e := visit(source, ads); e != nil {
+			return e
+		}
+	}
+	return nil
+}
 func (s *Service) SyncFeed(ctx context.Context, id string, advisories []domain.Advisory, etag, modified string, fetchErr error) error {
-	if fetchErr == nil && len(advisories) == 0 {
-		fetchErr = errors.New("empty_snapshot")
+	return s.SyncSnapshot(ctx, id, sliceSnapshot(advisories), etag, modified, fetchErr)
+}
+func (s *Service) SyncSnapshot(ctx context.Context, id string, snapshot AdvisorySnapshot, etag, modified string, fetchErr error) error {
+	if fetchErr != nil {
+		return s.feedError(ctx, id, fetchErr)
 	}
 	err := s.store.Write(ctx, func(tx Tx) error {
 		f := domain.Feed{ID: id}
@@ -63,16 +89,42 @@ func (s *Service) SyncFeed(ctx context.Context, id string, advisories []domain.A
 			return e
 		}
 		f.LastAttempt = s.now()
-		if fetchErr != nil {
-			f.Error = "sync_failed"
-			return tx.Put("feed", id, f)
-		}
 		f.LastSuccess = s.now()
 		f.Error = ""
 		f.ETag = etag
 		f.SourceModified = modified
-		f.Count = len(advisories)
-		if e := tx.Put("advisories", id, advisories); e != nil {
+		f.Count = 0
+		var previous []string
+		if e := tx.Get("feed-sources", id, &previous); e != nil && e != ErrNotFound {
+			return e
+		}
+		current := map[string]bool{}
+		keys := []string{}
+		if e := snapshot.Walk(func(source string, records []domain.Advisory) error {
+			if current[source] || source == "" {
+				return ErrInvalid
+			}
+			current[source] = true
+			keys = append(keys, source)
+			f.Count += len(records)
+			return tx.Put("advisory:"+id, source, records)
+		}); e != nil {
+			return e
+		}
+		if f.Count == 0 {
+			return errors.New("empty_snapshot")
+		}
+		for _, source := range previous {
+			if !current[source] {
+				if e := tx.Delete("advisory:"+id, source); e != nil {
+					return e
+				}
+			}
+		}
+		if e := tx.Put("feed-sources", id, keys); e != nil {
+			return e
+		}
+		if e := tx.Delete("advisories", id); e != nil {
 			return e
 		}
 		if e := tx.Put("feed", id, f); e != nil {
@@ -90,10 +142,26 @@ func (s *Service) SyncFeed(ctx context.Context, id string, advisories []domain.A
 		return nil
 	})
 	if err != nil {
+		return s.feedError(ctx, id, err)
+	}
+	return nil
+}
+func (s *Service) feedError(ctx context.Context, id string, cause error) error {
+	err := s.store.Write(ctx, func(tx Tx) error {
+		f := domain.Feed{ID: id}
+		if e := tx.Get("feed", id, &f); e != nil && e != ErrNotFound {
+			return e
+		}
+		f.LastAttempt = s.now()
+		f.Error = "sync_failed"
+		return tx.Put("feed", id, f)
+	})
+	if err != nil {
 		return err
 	}
-	return fetchErr
+	return cause
 }
+
 func (s *Service) FeedUnchanged(ctx context.Context, id string) error {
 	return s.store.Write(ctx, func(tx Tx) error {
 		var f domain.Feed
@@ -157,9 +225,16 @@ func (s *Service) reassess(tx Tx, n domain.Node) error {
 		packagesBySource[p.Source] = append(packagesBySource[p.Source], p)
 	}
 	for _, feed := range feeds {
-		var ads []domain.Advisory
-		if tx.Get("advisories", feed.ID, &ads) != nil {
+		if feed.ID != os.ID {
 			continue
+		}
+		ads := []domain.Advisory{}
+		for source := range packagesBySource {
+			var records []domain.Advisory
+			if e := tx.Get("advisory:"+feed.ID, source, &records); e != nil && e != ErrNotFound {
+				return e
+			}
+			ads = append(ads, records...)
 		}
 		for _, a := range ads {
 			if a.Distro != os.ID || !(a.Release == os.Codename || a.Release == os.Version || strings.TrimSuffix(a.Release, ":LTS") == os.Version) {

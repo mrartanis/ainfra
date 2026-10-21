@@ -1,0 +1,7 @@
+[Unit]
+Description=Optional APT metadata refresh (does not install packages)
+After=network-online.target
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/apt-get -o APT::Update::Error-Mode=any -o DPkg::Lock::Timeout=60 update
+TimeoutStartSec=15min

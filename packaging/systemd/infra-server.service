@@ -1,0 +1,23 @@
+[Unit]
+Description=Infra inventory HTTP API
+After=network-online.target
+Wants=network-online.target
+[Service]
+User=infra
+Group=infra
+StateDirectory=infra
+StateDirectoryMode=0700
+UMask=0077
+ExecStart=/usr/local/bin/infra-server serve --db /var/lib/infra/infra.db --listen 127.0.0.1:8080 --retention-days 90 --max-history 100000 --document-revisions 20 --max-db-mib 1024
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,20 @@
+[Unit]
+Description=Infra read-only inventory collection
+After=network-online.target
+Wants=network-online.target
+[Service]
+Type=oneshot
+User=infra-agent
+Group=infra-agent
+StateDirectory=infra-agent
+StateDirectoryMode=0700
+UMask=0077
+ExecStart=/usr/local/bin/infra-agent run --config /etc/infra/agent.json
+TimeoutStartSec=330
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK

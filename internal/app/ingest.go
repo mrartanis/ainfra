@@ -26,7 +26,8 @@ func contains(ss []string, s string) bool {
 }
 func reader(p domain.Principal) bool { return contains([]string{"reader", "editor", "admin"}, p.Role) }
 func (s *Service) event(tx Tx, p domain.Principal, kind, id, detail string) error {
-	return tx.Put("event", s.id(), domain.Event{Kind: kind, Entity: id, Actor: p.ID, At: s.now(), Detail: detail})
+	eventID := s.id()
+	return tx.Put("event", eventID, domain.Event{ID: eventID, Kind: kind, Entity: id, Actor: p.ID, At: s.now(), Detail: detail})
 }
 func (s *Service) IngestReport(ctx context.Context, p domain.Principal, r domain.Report) (ack domain.Ack, err error) {
 	ack = domain.Ack{ID: r.ID, Status: "accepted"}
@@ -37,6 +38,11 @@ func (s *Service) IngestReport(ctx context.Context, p domain.Principal, r domain
 		return ack, ErrInvalid
 	}
 	for name, section := range r.Collectors {
+		if name == "checks" && len(section.Data) > 0 {
+			if e := ValidateChecks(section.Data); e != nil {
+				return ack, e
+			}
+		}
 		if !contains([]string{"os", "packages", "network", "wireguard", "checks", "disks"}, name) || !contains([]string{"ok", "partial", "error", "unsupported", "disabled"}, section.Status) {
 			return ack, ErrInvalid
 		}
@@ -99,6 +105,11 @@ func (s *Service) IngestReport(ctx context.Context, p domain.Principal, r domain
 				old := n.Observations[k]
 				if old.ObservedAt.IsZero() || !v.ObservedAt.Before(old.ObservedAt) {
 					n.Observations[k] = v
+					if k == "checks" {
+						if e := applyChecks(&n, v.Data); e != nil {
+							return e
+						}
+					}
 				}
 			}
 		}

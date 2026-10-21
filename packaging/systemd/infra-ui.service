@@ -1,0 +1,14 @@
+[Unit]
+Description=Infra standalone web UI
+After=network.target infra-server.service
+[Service]
+DynamicUser=true
+ExecStart=/usr/local/bin/infra-ui --listen 127.0.0.1:8081 --api http://127.0.0.1:8080
+Restart=on-failure
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+[Install]
+WantedBy=multi-user.target

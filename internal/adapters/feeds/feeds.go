@@ -19,20 +19,25 @@ const DebianURL = "https://security-tracker.debian.org/tracker/data/json"
 const UbuntuURL = "https://security-metadata.canonical.com/osv/osv-all.tar.xz"
 
 func Debian(r io.Reader) ([]domain.Advisory, error) {
+	out := []domain.Advisory{}
+	err := DebianStream(r, func(a domain.Advisory) error { out = append(out, a); return nil })
+	return out, err
+}
+func DebianStream(r io.Reader, emit func(domain.Advisory) error) error {
 	d := json.NewDecoder(io.LimitReader(r, 256<<20))
 	tok, e := d.Token()
 	if e != nil || tok != json.Delim('{') {
-		return nil, errors.New("invalid Debian snapshot")
+		return errors.New("invalid Debian snapshot")
 	}
-	out := []domain.Advisory{}
+	count := 0
 	for d.More() {
 		tok, e = d.Token()
 		if e != nil {
-			return nil, e
+			return e
 		}
 		source, ok := tok.(string)
 		if !ok {
-			return nil, errors.New("invalid source")
+			return errors.New("invalid source")
 		}
 		var issues map[string]struct {
 			Description string `json:"description"`
@@ -45,24 +50,27 @@ func Debian(r io.Reader) ([]domain.Advisory, error) {
 			} `json:"releases"`
 		}
 		if e = d.Decode(&issues); e != nil {
-			return nil, e
+			return e
 		}
 		for id, v := range issues {
 			for release, status := range v.Releases {
 				if status.Status == "" {
-					return nil, errors.New("missing release status")
+					return errors.New("missing release status")
 				}
-				out = append(out, domain.Advisory{ID: id, NativeID: id, Provider: "debian", Distro: "debian", Release: release, Source: source, Fixed: status.Fixed, Status: status.Status, Severity: status.Urgency, Notes: status.NoDSA + " " + status.Reason, URL: "https://security-tracker.debian.org/tracker/" + id})
+				if e := emit(domain.Advisory{ID: id, NativeID: id, Provider: "debian", Distro: "debian", Release: release, Source: source, Fixed: status.Fixed, Status: status.Status, Severity: status.Urgency, Notes: status.NoDSA + " " + status.Reason, URL: "https://security-tracker.debian.org/tracker/" + id}); e != nil {
+					return e
+				}
+				count++
 			}
 		}
 	}
 	if _, e = d.Token(); e != nil {
-		return nil, e
+		return e
 	}
-	if d.Decode(new(any)) != io.EOF || len(out) == 0 {
-		return nil, errors.New("empty or trailing Debian snapshot")
+	if d.Decode(new(any)) != io.EOF || count == 0 {
+		return errors.New("empty or trailing Debian snapshot")
 	}
-	return out, nil
+	return nil
 }
 
 type osv struct {
@@ -92,6 +100,7 @@ func Ubuntu(b []byte) ([]domain.Advisory, error) {
 	}
 	ids := []string{}
 	for _, id := range append(v.Upstream, v.Aliases...) {
+		id = strings.TrimPrefix(id, "UBUNTU-")
 		if strings.HasPrefix(id, "CVE-") {
 			ids = append(ids, id)
 		}
@@ -104,6 +113,13 @@ func Ubuntu(b []byte) ([]domain.Advisory, error) {
 		}
 	}
 	out := []domain.Advisory{}
+	status := "unknown"
+	if strings.HasPrefix(v.ID, "USN-") {
+		status = "notice_only"
+	}
+	if strings.HasPrefix(v.ID, "LSN-") {
+		return out, nil
+	}
 	for _, p := range v.Affected {
 		eco := p.Package.Ecosystem
 		if !strings.HasPrefix(eco, "Ubuntu:") {
@@ -133,20 +149,33 @@ func Ubuntu(b []byte) ([]domain.Advisory, error) {
 				}
 			}
 			for _, id := range ids {
-				out = append(out, domain.Advisory{ID: id, NativeID: v.ID, Provider: "ubuntu", Distro: "ubuntu", Release: eco, Channel: channel, Source: p.Package.Name, Introduced: introduced, Fixed: fixed, Status: "unknown", Withdrawn: v.Withdrawn != "", URL: "https://ubuntu.com/security/" + id})
+				out = append(out, domain.Advisory{ID: id, NativeID: v.ID, Provider: "ubuntu", Distro: "ubuntu", Release: eco, Channel: channel, Source: p.Package.Name, Introduced: introduced, Fixed: fixed, Status: status, Withdrawn: v.Withdrawn != "", URL: "https://ubuntu.com/security/" + id})
 			}
 		}
 	}
 	return out, nil
 }
 func UbuntuArchive(r io.Reader) ([]domain.Advisory, error) {
-	xr, e := xz.NewReader(io.LimitReader(r, 80<<20))
+	stage, e := NewStage("")
 	if e != nil {
 		return nil, e
 	}
-	limited := &io.LimitedReader{R: xr, N: 1 << 30}
+	defer stage.Close()
+	if e = UbuntuArchiveStream(r, stage.Emit); e != nil {
+		return nil, e
+	}
+	out := []domain.Advisory{}
+	e = stage.Walk(func(_ string, ads []domain.Advisory) error { out = append(out, ads...); return nil })
+	return out, e
+}
+func UbuntuArchiveStream(r io.Reader, emit func(domain.Advisory) error) error {
+	xr, e := xz.NewReader(io.LimitReader(r, 80<<20))
+	if e != nil {
+		return e
+	}
+	limited := &io.LimitedReader{R: xr, N: 16 << 30}
 	tr := tar.NewReader(limited)
-	byKey := map[string]domain.Advisory{}
+	emitted := 0
 	count := 0
 	for {
 		h, e := tr.Next()
@@ -154,49 +183,47 @@ func UbuntuArchive(r io.Reader) ([]domain.Advisory, error) {
 			break
 		}
 		if e != nil {
-			return nil, e
+			return e
 		}
 		if h.Typeflag != tar.TypeReg {
 			continue
 		}
 		clean := path.Clean(h.Name)
 		if strings.HasPrefix(clean, "../") || strings.HasPrefix(clean, "/") {
-			return nil, errors.New("unsafe archive path")
+			return errors.New("unsafe archive path")
 		}
 		if !strings.HasSuffix(clean, ".json") {
 			continue
 		}
-		if h.Size > 4<<20 {
-			return nil, errors.New("OSV record too large")
+		if h.Size > 16<<20 {
+			return errors.New("OSV record too large")
 		}
 		b, e := io.ReadAll(tr)
 		if e != nil {
-			return nil, e
+			return e
 		}
 		ads, e := Ubuntu(b)
 		if e != nil {
-			return nil, e
+			return e
 		}
 		count++
 		if count > 200000 {
-			return nil, errors.New("too many records")
+			return errors.New("too many records")
 		}
 		for _, a := range ads {
-			k := a.ID + "/" + a.Release + "/" + a.Channel + "/" + a.Source
-			old, exists := byKey[k]
-			if !exists || strings.Contains(a.NativeID, "CVE-") || !strings.Contains(old.NativeID, "CVE-") {
-				byKey[k] = a
+			if a.Release != "22.04:LTS" && a.Release != "24.04:LTS" && a.Release != "26.04:LTS" {
+				continue
 			}
+			if e := emit(a); e != nil {
+				return e
+			}
+			emitted++
 		}
 	}
-	if limited.N <= 0 || len(byKey) == 0 {
-		return nil, errors.New("empty or oversized OSV archive")
+	if limited.N <= 0 || emitted == 0 {
+		return errors.New("empty or oversized OSV archive")
 	}
-	out := make([]domain.Advisory, 0, len(byKey))
-	for _, a := range byKey {
-		out = append(out, a)
-	}
-	return out, nil
+	return nil
 }
 
 type HTTPClient interface {
@@ -214,6 +241,12 @@ type Snapshot struct {
 }
 
 func (s Source) Fetch(ctx context.Context, previous domain.Feed) (Snapshot, error) {
+	out := []domain.Advisory{}
+	snapshot, err := s.FetchTo(ctx, previous, func(a domain.Advisory) error { out = append(out, a); return nil })
+	snapshot.Records = out
+	return snapshot, err
+}
+func (s Source) FetchTo(ctx context.Context, previous domain.Feed, emit func(domain.Advisory) error) (Snapshot, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
 	req, e := http.NewRequestWithContext(ctx, "GET", s.URL, nil)
@@ -237,17 +270,16 @@ func (s Source) Fetch(ctx context.Context, previous domain.Feed) (Snapshot, erro
 	if resp.StatusCode != 200 {
 		return Snapshot{}, fmt.Errorf("feed HTTP %d", resp.StatusCode)
 	}
-	var ads []domain.Advisory
 	switch s.ID {
 	case "debian":
-		ads, e = Debian(resp.Body)
+		e = DebianStream(resp.Body, emit)
 	case "ubuntu":
-		ads, e = UbuntuArchive(resp.Body)
+		e = UbuntuArchiveStream(resp.Body, emit)
 	default:
 		e = errors.New("unknown provider")
 	}
 	if e != nil {
 		return Snapshot{}, e
 	}
-	return Snapshot{Records: ads, ETag: resp.Header.Get("ETag"), Modified: resp.Header.Get("Last-Modified")}, nil
+	return Snapshot{ETag: resp.Header.Get("ETag"), Modified: resp.Header.Get("Last-Modified")}, nil
 }

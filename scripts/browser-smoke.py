@@ -1,0 +1,36 @@
+"""Opt-in local UI smoke. Requires playwright; never prints credentials."""
+import os
+from pathlib import Path
+from playwright.sync_api import sync_playwright
+url = os.environ.get('INFRA_UI_URL', 'http://127.0.0.1:18081')
+token_file = Path(os.environ.get('INFRA_ADMIN_TOKEN_FILE', '.local/admin.token'))
+with sync_playwright() as p:
+    browser = p.chromium.launch(headless=True)
+    page = browser.new_page(viewport={'width': 1440, 'height': 900})
+    page.goto(url + '/login')
+    page.get_by_label('Токен доступа').fill(token_file.read_text().strip())
+    page.get_by_role('button', name='Войти', exact=True).click()
+    page.wait_for_url(url + '/')
+    assert page.get_by_role('heading', name='Узлы', exact=True).is_visible()
+    Path('.local/screenshots').mkdir(parents=True, exist_ok=True)
+    page.screenshot(path='.local/screenshots/nodes-desktop.png', full_page=True)
+    page.get_by_role('link', name='local-ubuntu', exact=True).click()
+    assert page.get_by_role('heading', name='local-ubuntu', exact=True).is_visible()
+    page.get_by_role('link', name='Записи', exact=True).click()
+    page.get_by_role('link', name='+ Запись', exact=True).click()
+    page.get_by_label('Заголовок').fill('Browser smoke: инструкция')
+    page.get_by_label('Markdown', exact=True).fill('# Проверка\n\nТекст <script>alert(1)</script> остаётся данными.')
+    page.get_by_role('button', name='Сохранить новую ревизию').click()
+    assert page.get_by_role('heading', name='Browser smoke: инструкция').is_visible()
+    assert page.locator('script').count() == 0
+    page.goto(url + '/')
+    page.set_viewport_size({'width': 390, 'height': 844})
+    assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+    page.screenshot(path='.local/screenshots/nodes-mobile.png', full_page=True)
+    page.get_by_role('link', name='local-ubuntu', exact=True).click()
+    assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+    page.screenshot(path='.local/screenshots/node-mobile.png', full_page=True)
+    page.goto(url + '/settings')
+    assert page.get_by_role('heading', name='Хранение', exact=True).is_visible()
+    browser.close()
+print('Browser smoke passed: login, nodes, document create, escaping, mobile widths, settings')
