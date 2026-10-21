@@ -15,7 +15,7 @@ func Assess(p domain.Package, a domain.Advisory) (string, string) {
 	if a.Status == "notice_only" {
 		return "unknown", "unknown"
 	}
-	official := a.Distro == "debian" && p.Origin == "Debian" || a.Distro == "ubuntu" && p.Origin == "Ubuntu"
+	official := officialOrigin(a.Distro, p.Origin)
 	if !official || p.OriginEvidence == "" || strings.Contains(p.Suite, "backports") || strings.Contains(p.Version, "~bpo") || p.SourceVersion == "" {
 		return "unknown", "unknown"
 	}
@@ -51,7 +51,7 @@ func Assess(p domain.Package, a domain.Advisory) (string, string) {
 		return "not_affected", "unknown"
 	}
 	rem := "fix_published_not_candidate"
-	if p.CandidateSource == a.Source && p.CandidateSourceVersion != "" {
+	if candidateTrusted(p, a) && p.CandidateSource == a.Source && p.CandidateSourceVersion != "" {
 		c, e = version.Compare(p.CandidateSourceVersion, a.Fixed)
 		if e == nil && c >= 0 {
 			rem = "candidate_fixes"
@@ -383,4 +383,18 @@ func suiteMatchesRelease(suite, codename string) bool {
 		}
 	}
 	return false
+}
+
+func officialOrigin(distro, origin string) bool {
+	return distro == "debian" && origin == "Debian" || distro == "ubuntu" && contains([]string{"Ubuntu", "UbuntuESM", "UbuntuESMApps"}, origin)
+}
+func candidateTrusted(p domain.Package, a domain.Advisory) bool {
+	if !officialOrigin(a.Distro, p.CandidateOrigin) || p.CandidateOriginEvidence == "" || p.CandidateOriginEvidence == "ambiguous" || p.CandidateOriginEvidence == "unknown" {
+		return false
+	}
+	base := p.Suite
+	for _, suffix := range []string{"-infra-security", "-apps-security", "-infra-updates", "-apps-updates", "-security", "-updates"} {
+		base = strings.TrimSuffix(base, suffix)
+	}
+	return suiteMatchesRelease(p.CandidateSuite, base)
 }

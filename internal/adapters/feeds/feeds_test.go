@@ -52,7 +52,7 @@ func TestUbuntuMultipleIntervalsDoNotLoseEarlierAffectedVersions(t *testing.T) {
 		t.Fatal(ads, err)
 	}
 	for _, test := range []struct{ version, assessment string }{{"1.5", "affected"}, {"2.5", "not_affected"}, {"3.5", "affected"}, {"4", "not_affected"}} {
-		p := domain.Package{Source: "foo", SourceVersion: test.version, Version: test.version, Origin: "Ubuntu", OriginEvidence: "apt-policy", CandidateSource: "foo", CandidateSourceVersion: "4"}
+		p := domain.Package{Source: "foo", SourceVersion: test.version, Version: test.version, Origin: "Ubuntu", OriginEvidence: "apt-policy", Suite: "noble", CandidateOrigin: "Ubuntu", CandidateSuite: "noble", CandidateOriginEvidence: "apt-policy", CandidateSource: "foo", CandidateSourceVersion: "4"}
 		assessment, remediation := app.Assess(p, ads[0])
 		if assessment != test.assessment || (assessment == "affected" && remediation != "candidate_fixes") {
 			t.Fatal(test, assessment, remediation)
@@ -73,7 +73,7 @@ func TestUbuntuRangeBoundariesAndCandidateReintroduction(t *testing.T) {
 		if err != nil || len(ads) != 1 {
 			t.Fatal(ads, err)
 		}
-		p := domain.Package{Source: "foo", SourceVersion: test.installed, Version: test.installed, Origin: "Ubuntu", OriginEvidence: "apt-policy", CandidateSource: "foo", CandidateSourceVersion: test.candidate}
+		p := domain.Package{Source: "foo", SourceVersion: test.installed, Version: test.installed, Origin: "Ubuntu", OriginEvidence: "apt-policy", Suite: "noble", CandidateOrigin: "Ubuntu", CandidateSuite: "noble", CandidateOriginEvidence: "apt-policy", CandidateSource: "foo", CandidateSourceVersion: test.candidate}
 		as, rem := app.Assess(p, ads[0])
 		if as != test.want || rem != test.rem {
 			t.Fatal(test, as, rem)

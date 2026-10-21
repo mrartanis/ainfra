@@ -17,7 +17,7 @@ func assessRanges(p domain.Package, a domain.Advisory) (string, string) {
 	if !fix {
 		return "affected_or_under_investigation", "unknown"
 	}
-	if p.CandidateSource == a.Source && p.CandidateSourceVersion != "" {
+	if candidateTrusted(p, a) && p.CandidateSource == a.Source && p.CandidateSourceVersion != "" {
 		candidate, _, err := includedInRanges(p.CandidateSourceVersion, a.Ranges)
 		comparison, compareErr := version.Compare(p.CandidateSourceVersion, p.SourceVersion)
 		if err == nil && compareErr == nil && !candidate && comparison > 0 {

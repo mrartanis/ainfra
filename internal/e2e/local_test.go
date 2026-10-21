@@ -18,7 +18,7 @@ import (
 type localCollector struct{ now time.Time }
 
 func (c localCollector) Collect(context.Context, []string) map[string]domain.Section {
-	return map[string]domain.Section{"os": {Status: "ok", Complete: true, ObservedAt: c.now, Data: json.RawMessage(`{"id":"debian","codename":"bookworm"}`)}, "packages": {Status: "ok", Complete: true, ObservedAt: c.now, Data: json.RawMessage(`{"packages":[{"name":"libssl3","arch":"amd64","version":"3.0.1","source":"openssl","source_version":"3.0.1","state":"installed","origin":"Debian","origin_evidence":"apt-policy","suite":"bookworm","candidate":"3.0.2","candidate_source":"openssl","candidate_source_version":"3.0.2"}]}`)}}
+	return map[string]domain.Section{"os": {Status: "ok", Complete: true, ObservedAt: c.now, Data: json.RawMessage(`{"id":"debian","codename":"bookworm"}`)}, "packages": {Status: "ok", Complete: true, ObservedAt: c.now, Data: json.RawMessage(`{"packages":[{"name":"libssl3","arch":"amd64","version":"3.0.1","source":"openssl","source_version":"3.0.1","state":"installed","origin":"Debian","origin_evidence":"apt-policy","suite":"bookworm","candidate":"3.0.2","candidate_origin":"Debian","candidate_suite":"bookworm","candidate_origin_evidence":"apt-policy","candidate_source":"openssl","candidate_source_version":"3.0.2"}]}`)}}
 }
 func TestAgentAPIPlanBackupRestore(t *testing.T) {
 	ctx := context.Background()

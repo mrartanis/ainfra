@@ -846,10 +846,19 @@
         "candidate": {
           "type": "string"
         },
+        "candidate_origin": {
+          "type": "string"
+        },
+        "candidate_origin_evidence": {
+          "type": "string"
+        },
         "candidate_source": {
           "type": "string"
         },
         "candidate_source_version": {
+          "type": "string"
+        },
+        "candidate_suite": {
           "type": "string"
         },
         "held": {
@@ -881,6 +890,9 @@
         }
       },
       "required": [
+        "candidate_origin",
+        "candidate_suite",
+        "candidate_origin_evidence",
         "name",
         "arch",
         "version",

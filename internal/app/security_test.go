@@ -18,7 +18,7 @@ func TestFeedReassessesInventoryAndRetainsOnOutage(t *testing.T) {
 	ad := domain.Principal{Role: "admin"}
 	n, _ := s.SaveNode(ctx, ad, domain.Node{Name: "debian"}, 0)
 	p := domain.Principal{Role: "agent", Instance: "i", Nodes: []string{n.ID}}
-	data, _ := json.Marshal(domain.PackageData{Packages: []domain.Package{{Name: "libssl", Version: "9", Source: "openssl", SourceVersion: "1.0-1", Origin: "Debian", OriginEvidence: "apt-policy", Suite: "bookworm", Candidate: "9.1", CandidateSource: "openssl", CandidateSourceVersion: "1.0-2"}}})
+	data, _ := json.Marshal(domain.PackageData{Packages: []domain.Package{{Name: "libssl", Version: "9", Source: "openssl", SourceVersion: "1.0-1", Origin: "Debian", OriginEvidence: "apt-policy", Suite: "bookworm", Candidate: "9.1", CandidateOrigin: "Debian", CandidateSuite: "bookworm", CandidateOriginEvidence: "apt-policy", CandidateSource: "openssl", CandidateSourceVersion: "1.0-2"}}})
 	r := domain.Report{SchemaVersion: 1, ID: "r", NodeID: n.ID, Instance: "i", Sequence: 1, ObservedAt: now, Collectors: map[string]domain.Section{"os": {Status: "ok", Complete: true, ObservedAt: now, Data: json.RawMessage(`{"id":"debian","codename":"bookworm"}`)}, "packages": {Status: "ok", Complete: true, ObservedAt: now, Data: data}}}
 	if _, e := s.IngestReport(ctx, p, r); e != nil {
 		t.Fatal(e)
@@ -166,5 +166,24 @@ func TestMixedReleasePackageIsNotConfidentlyAssessed(t *testing.T) {
 	fs, err := s.Findings(ctx, admin, n.ID)
 	if err != nil || len(fs) != 1 || fs[0].Assessment != "unknown" {
 		t.Fatal(fs, err)
+	}
+}
+
+func TestCandidateNeedsMatchingVendorAndReleaseEvidence(t *testing.T) {
+	a := domain.Advisory{Distro: "ubuntu", Source: "foo", Fixed: "2", Release: "24.04:LTS", Channel: "Pro"}
+	p := domain.Package{Source: "foo", SourceVersion: "1", Version: "1", Origin: "Ubuntu", OriginEvidence: "apt-policy", Suite: "noble", CandidateSource: "foo", CandidateSourceVersion: "3"}
+	for _, test := range []struct{ origin, suite, evidence, want string }{
+		{"", "", "", "fix_published_not_candidate"},
+		{"LP-PPA-foo", "noble", "apt-policy", "fix_published_not_candidate"},
+		{"UbuntuESMApps", "jammy", "apt-policy", "fix_published_not_candidate"},
+		{"UbuntuESMApps", "noble-apps-security", "apt-policy", "candidate_fixes"},
+	} {
+		p.CandidateOrigin = test.origin
+		p.CandidateSuite = test.suite
+		p.CandidateOriginEvidence = test.evidence
+		as, rem := app.Assess(p, a)
+		if as != "affected" || rem != test.want {
+			t.Fatal(test, as, rem)
+		}
 	}
 }

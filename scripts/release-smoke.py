@@ -1,5 +1,6 @@
 """Opt-in archive install/restart/restore smoke in a clean, offline Debian container."""
 import json
+import argparse
 import os
 from pathlib import Path
 import subprocess
@@ -9,7 +10,10 @@ import uuid
 
 root = Path(__file__).resolve().parent.parent
 image = 'debian@sha256:62bd423aeee912639ca8ee681c2b762cb3e25137e0a92b20be455898a9f034ad'
-archive = root / 'dist/infra-0.1.0-linux-amd64.tar.gz'
+parser = argparse.ArgumentParser()
+parser.add_argument('--arch', choices=['amd64', 'arm64'], default='amd64')
+arch = parser.parse_args().arch
+archive = root / ('dist/infra-0.1.0-linux-' + arch + '.tar.gz')
 name = 'infra-release-' + uuid.uuid4().hex[:12]
 with tempfile.TemporaryDirectory(prefix='infra-release-') as directory:
     config = Path(directory)
@@ -35,7 +39,7 @@ with tempfile.TemporaryDirectory(prefix='infra-release-') as directory:
             time.sleep(.1)
         raise RuntimeError('server did not become ready')
     try:
-        subprocess.run(['docker', 'run', '-d', '--name', name, '--network', 'none', '--read-only',
+        subprocess.run(['docker', 'run', '-d', '--platform', 'linux/' + arch, '--name', name, '--network', 'none', '--read-only',
                         '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', '--user', f'{os.getuid()}:{os.getgid()}',
                         '--tmpfs', '/tmp:exec,mode=1777', '-v', f'{archive}:/release.tar.gz:ro', '-v', f'{config}:/config:ro',
                         image, 'sleep', '600'], check=True, capture_output=True)
@@ -76,6 +80,6 @@ with tempfile.TemporaryDirectory(prefix='infra-release-') as directory:
         execute('rm', '-r', '/tmp/install')
         execute('test', '-s', db)  # Uninstall leaves state and backup intact.
         execute('test', '-s', '/tmp/state/backup.db')
-        print('Release smoke passed: clean non-root/offline install, real agent, restart, active backup/restore, auth, search, export, uninstall preserves data')
+        print(arch + ' release smoke passed: clean non-root/offline install, real agent, restart, active backup/restore, auth, search, export, uninstall preserves data')
     finally:
         subprocess.run(['docker', 'rm', '-f', name], capture_output=True)

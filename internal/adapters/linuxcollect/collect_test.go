@@ -60,3 +60,14 @@ func TestCommandOutputLimitCannotBeBypassedByIOCopy(t *testing.T) {
 		t.Fatal("collector accepted output larger than 8 MiB")
 	}
 }
+
+func TestAPTPolicyRetainsCandidateSourcesIndependently(t *testing.T) {
+	policies, err := linuxcollect.ParsePolicy("foo:\n  Installed: 1\n  Candidate: 2\n  Version table:\n     2 500\n        500 https://candidate.invalid/ubuntu noble/main amd64 Packages\n *** 1 500\n        500 https://installed.invalid/ubuntu noble/main amd64 Packages\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := policies["foo"]
+	if len(p.CandidateSources) != 1 || !strings.Contains(p.CandidateSources[0], "candidate.invalid") || len(p.InstalledSources) != 1 || !strings.Contains(p.InstalledSources[0], "installed.invalid") {
+		t.Fatal(p)
+	}
+}

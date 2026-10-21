@@ -130,20 +130,23 @@ type Event struct {
 	Detail string    `json:"detail"`
 }
 type Package struct {
-	Name                   string `json:"name"`
-	Arch                   string `json:"arch"`
-	Version                string `json:"version"`
-	Source                 string `json:"source"`
-	SourceVersion          string `json:"source_version"`
-	State                  string `json:"state"`
-	Candidate              string `json:"candidate"`
-	CandidateSource        string `json:"candidate_source"`
-	CandidateSourceVersion string `json:"candidate_source_version"`
-	Origin                 string `json:"origin"`
-	OriginEvidence         string `json:"origin_evidence"`
-	Suite                  string `json:"suite"`
-	Held                   bool   `json:"held"`
-	BlockedReason          string `json:"blocked_reason"`
+	CandidateOrigin         string `json:"candidate_origin"`
+	CandidateSuite          string `json:"candidate_suite"`
+	CandidateOriginEvidence string `json:"candidate_origin_evidence"`
+	Name                    string `json:"name"`
+	Arch                    string `json:"arch"`
+	Version                 string `json:"version"`
+	Source                  string `json:"source"`
+	SourceVersion           string `json:"source_version"`
+	State                   string `json:"state"`
+	Candidate               string `json:"candidate"`
+	CandidateSource         string `json:"candidate_source"`
+	CandidateSourceVersion  string `json:"candidate_source_version"`
+	Origin                  string `json:"origin"`
+	OriginEvidence          string `json:"origin_evidence"`
+	Suite                   string `json:"suite"`
+	Held                    bool   `json:"held"`
+	BlockedReason           string `json:"blocked_reason"`
 }
 type APTRefresh struct {
 	LastAttempt time.Time `json:"last_attempt"`

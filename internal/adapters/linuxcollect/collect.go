@@ -200,18 +200,10 @@ func (c *Collector) Packages(ctx context.Context) domain.Section {
 			if p.Held {
 				p.BlockedReason = "held"
 			}
-			for _, src := range pol.InstalledSources {
-				if o, ok := origins[src]; ok {
-					if p.Origin != "" && p.Origin != o.Origin {
-						p.Origin = ""
-						p.OriginEvidence = "ambiguous"
-						break
-					}
-					p.Origin = o.Origin
-					p.Suite = o.Suite
-					p.OriginEvidence = "apt-policy (repository match, historical install origin unproven)"
-				}
-			}
+
+			p.Origin, p.Suite, p.OriginEvidence = policyEvidence(pol.InstalledSources, origins)
+			p.CandidateOrigin, p.CandidateSuite, p.CandidateOriginEvidence = policyEvidence(pol.CandidateSources, origins)
+
 			if p.Candidate != "" {
 				showArgs = append(showArgs, p.Name+":"+p.Arch+"="+p.Candidate)
 			}
@@ -244,6 +236,7 @@ func (c *Collector) Packages(ctx context.Context) domain.Section {
 }
 
 type Policy struct {
+	CandidateSources []string
 	Candidate        string
 	InstalledSources []string
 }
@@ -288,8 +281,13 @@ func ParsePolicy(text string) (map[string]Policy, error) {
 			if len(f) == 2 && f[0] != "Version" {
 				current = f[0]
 			}
-			if len(f) >= 3 && (strings.HasPrefix(f[1], "http://") || strings.HasPrefix(f[1], "https://")) && current == installed {
-				p.InstalledSources = append(p.InstalledSources, strings.Join(f[1:], " "))
+			if len(f) >= 3 && (strings.HasPrefix(f[1], "http://") || strings.HasPrefix(f[1], "https://")) {
+				if current == installed {
+					p.InstalledSources = append(p.InstalledSources, strings.Join(f[1:], " "))
+				}
+				if current == p.Candidate {
+					p.CandidateSources = append(p.CandidateSources, strings.Join(f[1:], " "))
+				}
 			}
 		}
 		out[name] = p
@@ -410,4 +408,22 @@ func (c *Collector) Collect(ctx context.Context, collectors []string) map[string
 		}
 	}
 	return out
+}
+
+func policyEvidence(sources []string, origins map[string]Origin) (string, string, string) {
+	var selected Origin
+	for i, source := range sources {
+		origin, ok := origins[source]
+		if !ok || origin.Origin == "" || origin.Suite == "" {
+			return "", "", "unknown"
+		}
+		if i > 0 && selected != origin {
+			return "", "", "ambiguous"
+		}
+		selected = origin
+	}
+	if len(sources) == 0 {
+		return "", "", ""
+	}
+	return selected.Origin, selected.Suite, "apt-policy (repository match, historical install origin unproven)"
 }
