@@ -83,3 +83,44 @@ func TestActualNodeAndDocumentResponsesMatchSchemas(t *testing.T) {
 		}
 	}
 }
+
+func TestReportSchemaDescribesTypedCollectorPayloads(t *testing.T) {
+	raw, err := os.ReadFile("../../api/report.schema.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc any
+	json.Unmarshal(raw, &doc)
+	compiler := jsonschema.NewCompiler()
+	compiler.AssertFormat()
+	if err = compiler.AddResource("https://infra.invalid/report.schema.json", doc); err != nil {
+		t.Fatal(err)
+	}
+	validator, err := compiler.Compile("https://infra.invalid/report.schema.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC()
+	for _, tc := range []struct {
+		name, data string
+		valid      bool
+	}{
+		{"os", `{"id":"ubuntu","uptime_seconds":null,"memory_free_bytes":123}`, true},
+		{"os", `{"id":"ubuntu","password":"forbidden"}`, false},
+		{"os", `{"cpu_load_percent":"not-a-number"}`, false},
+		{"os", `{"memory_bytes":-1}`, false},
+		{"packages", `{"packages":[{"name":"openssl","version":"1.0"}],"metadata_status":"unknown"}`, true},
+		{"packages", `{"packages":[{"name":"openssl","secret":"forbidden"}]}`, false},
+		{"checks", `[{"schema_version":1,"check_id":"copy","kind":"backup","observed_at":"2026-10-21T12:00:00Z","status":"error","data":{"last_attempt_at":"2026-10-21T12:00:00Z","last_attempt_status":"error"}}]`, true},
+		{"checks", `[{"schema_version":1,"check_id":"copy","kind":"backup","observed_at":"2026-10-21T12:00:00Z","status":"ok","data":{"last_attempt_at":"2026-10-21T12:00:00Z","last_attempt_status":"invented"}}]`, false},
+	} {
+		report := domain.Report{SchemaVersion: 1, ID: "r", NodeID: "node", Instance: "i", Sequence: 1, ObservedAt: now, Collectors: map[string]domain.Section{tc.name: {Status: "ok", Complete: true, ObservedAt: now, Data: json.RawMessage(tc.data)}}}
+		raw, _ := json.Marshal(report)
+		var wire any
+		json.Unmarshal(raw, &wire)
+		err = validator.Validate(wire)
+		if (err == nil) != tc.valid {
+			t.Fatalf("%s valid=%v: %v", tc.name, tc.valid, err)
+		}
+	}
+}

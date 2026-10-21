@@ -22,6 +22,23 @@
       ],
       "type": "object"
     },
+    "APTRefreshObservation": {
+      "additionalProperties": false,
+      "properties": {
+        "last_attempt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "last_success": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
     "Ack": {
       "additionalProperties": false,
       "properties": {
@@ -227,6 +244,125 @@
         "last_restore_test_at",
         "observed_at",
         "evidence"
+      ],
+      "type": "object"
+    },
+    "BackupResult": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence": {
+          "maxLength": 4096,
+          "type": "string"
+        },
+        "last_attempt_at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "last_attempt_status": {
+          "enum": [
+            "success",
+            "error"
+          ]
+        },
+        "last_restore_test_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "last_success_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "last_attempt_at",
+        "last_attempt_status"
+      ],
+      "type": "object"
+    },
+    "Check": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "backup"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "data": {
+                "$ref": "#/$defs/BackupResult"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "payment"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "data": {
+                "$ref": "#/$defs/PaymentResult"
+              }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "check_id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "type": "string"
+        },
+        "data": {},
+        "kind": {
+          "enum": [
+            "backup",
+            "payment"
+          ]
+        },
+        "observed_at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": 1
+        },
+        "status": {
+          "enum": [
+            "ok",
+            "error"
+          ]
+        }
+      },
+      "required": [
+        "schema_version",
+        "check_id",
+        "kind",
+        "observed_at",
+        "status",
+        "data"
       ],
       "type": "object"
     },
@@ -531,6 +667,23 @@
       ],
       "type": "object"
     },
+    "IssuedToken": {
+      "additionalProperties": false,
+      "properties": {
+        "secret": {
+          "description": "Returned once when issuing the token; never returned by token list",
+          "type": "string"
+        },
+        "token": {
+          "$ref": "#/$defs/Token"
+        }
+      },
+      "required": [
+        "secret",
+        "token"
+      ],
+      "type": "object"
+    },
     "Node": {
       "additionalProperties": false,
       "properties": {
@@ -641,6 +794,7 @@
           "type": "integer"
         },
         "sequence": {
+          "minimum": 0,
           "type": "integer"
         },
         "services": {
@@ -814,6 +968,7 @@
           "type": "integer"
         },
         "sequence": {
+          "minimum": 0,
           "readOnly": true,
           "type": "integer"
         },
@@ -851,6 +1006,222 @@
       "required": [
         "name"
       ],
+      "type": "object"
+    },
+    "OK": {
+      "additionalProperties": false,
+      "properties": {
+        "ok": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "ok"
+      ],
+      "type": "object"
+    },
+    "OSData": {
+      "additionalProperties": false,
+      "properties": {
+        "arch": {
+          "type": "string"
+        },
+        "codename": {
+          "type": "string"
+        },
+        "cpu": {
+          "type": "integer"
+        },
+        "cpu_load_percent": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "hostname": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "kernel": {
+          "type": "string"
+        },
+        "memory_bytes": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "memory_free_bytes": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "model": {
+          "type": "string"
+        },
+        "reboot": {
+          "type": "string"
+        },
+        "storage_bytes": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "storage_free_bytes": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "uptime_seconds": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "version": {
+          "type": "string"
+        },
+        "virtualization_hint": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "virtualization_hint",
+        "model",
+        "memory_free_bytes",
+        "storage_bytes",
+        "storage_free_bytes",
+        "cpu_load_percent",
+        "id",
+        "codename",
+        "version",
+        "hostname",
+        "arch",
+        "kernel",
+        "cpu",
+        "memory_bytes",
+        "uptime_seconds",
+        "reboot"
+      ],
+      "type": "object"
+    },
+    "OSObservation": {
+      "additionalProperties": false,
+      "properties": {
+        "arch": {
+          "type": "string"
+        },
+        "codename": {
+          "type": "string"
+        },
+        "cpu": {
+          "type": "integer"
+        },
+        "cpu_load_percent": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "hostname": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "kernel": {
+          "type": "string"
+        },
+        "memory_bytes": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "memory_free_bytes": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "model": {
+          "type": "string"
+        },
+        "reboot": {
+          "type": "string"
+        },
+        "storage_bytes": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "storage_free_bytes": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "uptime_seconds": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "version": {
+          "type": "string"
+        },
+        "virtualization_hint": {
+          "type": "string"
+        }
+      },
       "type": "object"
     },
     "Package": {
@@ -977,6 +1348,104 @@
       ],
       "type": "object"
     },
+    "PackageObservation": {
+      "additionalProperties": false,
+      "properties": {
+        "arch": {
+          "type": "string"
+        },
+        "blocked_reason": {
+          "type": "string"
+        },
+        "candidate": {
+          "type": "string"
+        },
+        "candidate_origin": {
+          "type": "string"
+        },
+        "candidate_origin_evidence": {
+          "type": "string"
+        },
+        "candidate_source": {
+          "type": "string"
+        },
+        "candidate_source_version": {
+          "type": "string"
+        },
+        "candidate_suite": {
+          "type": "string"
+        },
+        "held": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string"
+        },
+        "origin": {
+          "type": "string"
+        },
+        "origin_evidence": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "source_version": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "suite": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "PackageObservationData": {
+      "additionalProperties": false,
+      "properties": {
+        "metadata_refresh": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/APTRefreshObservation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "metadata_status": {
+          "type": "string"
+        },
+        "package_count": {
+          "type": "integer"
+        },
+        "packages": {
+          "items": {
+            "$ref": "#/$defs/PackageObservation"
+          },
+          "maxItems": 100000,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "simulation": {
+          "type": "string"
+        },
+        "unknown_origins": {
+          "type": "integer"
+        },
+        "updates": {
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
     "Payment": {
       "additionalProperties": false,
       "properties": {
@@ -1016,6 +1485,29 @@
         "currency",
         "note",
         "last_paid"
+      ],
+      "type": "object"
+    },
+    "PaymentResult": {
+      "additionalProperties": false,
+      "properties": {
+        "amount": {
+          "type": "string"
+        },
+        "currency": {
+          "type": "string"
+        },
+        "evidence": {
+          "maxLength": 4096,
+          "type": "string"
+        },
+        "next_due_date": {
+          "format": "date-time",
+          "type": "string"
+        }
+      },
+      "required": [
+        "next_due_date"
       ],
       "type": "object"
     },
@@ -1089,6 +1581,19 @@
       },
       "required": [
         "role"
+      ],
+      "type": "object"
+    },
+    "ReenrollInput": {
+      "additionalProperties": false,
+      "properties": {
+        "agent_instance_id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "agent_instance_id"
       ],
       "type": "object"
     },
@@ -1217,6 +1722,99 @@
             "$ref": "#/$defs/Section"
           },
           "maxProperties": 16,
+          "properties": {
+            "checks": {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/Section"
+                },
+                {
+                  "properties": {
+                    "data": {
+                      "items": {
+                        "$ref": "#/$defs/Check"
+                      },
+                      "maxItems": 1000,
+                      "type": "array"
+                    }
+                  }
+                }
+              ]
+            },
+            "disks": {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/Section"
+                },
+                {
+                  "properties": {
+                    "data": {
+                      "maxItems": 100000,
+                      "type": "array"
+                    }
+                  }
+                }
+              ]
+            },
+            "network": {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/Section"
+                },
+                {
+                  "properties": {
+                    "data": {
+                      "maxProperties": 256,
+                      "type": "object"
+                    }
+                  }
+                }
+              ]
+            },
+            "os": {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/Section"
+                },
+                {
+                  "properties": {
+                    "data": {
+                      "$ref": "#/$defs/OSObservation"
+                    }
+                  }
+                }
+              ]
+            },
+            "packages": {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/Section"
+                },
+                {
+                  "properties": {
+                    "data": {
+                      "$ref": "#/$defs/PackageObservationData"
+                    }
+                  }
+                }
+              ]
+            },
+            "wireguard": {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/Section"
+                },
+                {
+                  "properties": {
+                    "data": {
+                      "maxProperties": 256,
+                      "type": "object"
+                    }
+                  }
+                }
+              ]
+            }
+          },
           "propertyNames": {
             "enum": [
               "os",
@@ -1263,14 +1861,87 @@
       ],
       "type": "object"
     },
+    "Retention": {
+      "additionalProperties": false,
+      "properties": {
+        "days": {
+          "type": "integer"
+        },
+        "document_revisions": {
+          "type": "integer"
+        },
+        "max_database_mib": {
+          "type": "integer"
+        },
+        "max_history": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "days",
+        "max_history",
+        "document_revisions",
+        "max_database_mib"
+      ],
+      "type": "object"
+    },
+    "RetentionResult": {
+      "additionalProperties": false,
+      "properties": {
+        "database_bytes": {
+          "type": "integer"
+        },
+        "deleted": {
+          "type": "integer"
+        },
+        "last_run": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "policy": {
+          "$ref": "#/$defs/Retention"
+        },
+        "reusable_bytes": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "policy",
+        "last_run",
+        "deleted",
+        "database_bytes",
+        "reusable_bytes"
+      ],
+      "type": "object"
+    },
     "Section": {
       "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "ok",
+                  "partial"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "data"
+            ]
+          }
+        }
+      ],
       "properties": {
         "complete": {
           "type": "boolean"
         },
         "data": {},
         "error_code": {
+          "maxLength": 128,
           "type": "string"
         },
         "observed_at": {
@@ -1323,6 +1994,33 @@
         "exposure",
         "primary",
         "instructions"
+      ],
+      "type": "object"
+    },
+    "Settings": {
+      "additionalProperties": false,
+      "properties": {
+        "retention": {
+          "$ref": "#/$defs/RetentionResult"
+        }
+      },
+      "type": "object"
+    },
+    "SuppressionInput": {
+      "additionalProperties": false,
+      "properties": {
+        "reason": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "until": {
+          "format": "date-time",
+          "type": "string"
+        }
+      },
+      "required": [
+        "reason",
+        "until"
       ],
       "type": "object"
     },

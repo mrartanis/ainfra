@@ -28,7 +28,9 @@ func shape(t reflect.Type) any {
 		return schema{"type": "string"}
 	case reflect.Bool:
 		return schema{"type": "boolean"}
-	case reflect.Int, reflect.Int64, reflect.Uint64:
+	case reflect.Uint64:
+		return schema{"type": "integer", "minimum": 0}
+	case reflect.Int, reflect.Int64:
 		return schema{"type": "integer"}
 	case reflect.Float64:
 		return schema{"type": "number"}
@@ -110,6 +112,7 @@ func main() {
 	}
 	defs["PrincipalInput"] = schema{"type": "object", "required": []string{"role"}, "properties": schema{"role": schema{"enum": []string{"reader", "editor", "agent", "probe", "admin"}}, "nodes": schema{"type": []string{"array", "null"}, "items": schema{"type": "string"}}, "instance": schema{"type": "string"}}, "additionalProperties": false}
 	defs["RelationInput"] = schema{"type": "object", "required": []string{"source", "target", "type"}, "properties": defs["Relation"].(schema)["properties"], "additionalProperties": false}
+	payloadSchemas()
 	root := schema{"$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://infra.invalid/models.schema.json", "$defs": defs}
 	write("api/models.schema.json", root)
 	write("api/report.schema.json", schema{"$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://infra.invalid/report.schema.json", "$ref": "#/$defs/Report", "$defs": defs})
@@ -119,7 +122,7 @@ func main() {
 		array                       bool
 	}
 	routes := []route{
-		{"ingest/reports", "post", "Report", "Ack", false}, {"nodes", "get", "", "Node", true}, {"nodes", "post", "NodeInput", "Node", false}, {"nodes/{id}", "get", "", "Node", false}, {"nodes/{id}", "patch", "NodeInput", "Node", false}, {"nodes/{id}/packages", "get", "", "PackageData", false}, {"nodes/{id}/findings", "get", "", "Finding", true}, {"nodes/{id}/context", "get", "", "markdown", false}, {"nodes/{id}/pay", "post", "", "Node", false}, {"nodes/{id}/reenroll", "post", "object", "object", false}, {"attention", "get", "", "Attention", true}, {"search", "get", "", "object", true}, {"findings", "get", "", "Finding", true}, {"findings/{id}/suppress", "post", "object", "object", false}, {"feed-status", "get", "", "Feed", true}, {"documents", "get", "", "Document", true}, {"documents", "post", "DocumentInput", "Document", false}, {"documents/{id}", "get", "", "Document", false}, {"documents/{id}", "patch", "DocumentInput", "Document", false}, {"documents/{id}/approve", "post", "", "Document", false}, {"documents/{id}/status", "post", "PlanStatusInput", "Document", false}, {"relation-suggestions", "get", "", "RelationSuggestion", true}, {"relations", "get", "", "Relation", true}, {"relations", "post", "RelationInput", "Relation", false}, {"relations/{id}", "delete", "", "object", false}, {"events", "get", "", "Event", true}, {"tokens", "get", "", "Token", true}, {"tokens", "post", "PrincipalInput", "object", false}, {"tokens/{id}", "delete", "", "object", false}, {"me", "get", "", "Principal", false}, {"settings", "get", "", "object", false}}
+		{"ingest/reports", "post", "Report", "Ack", false}, {"nodes", "get", "", "Node", true}, {"nodes", "post", "NodeInput", "Node", false}, {"nodes/{id}", "get", "", "Node", false}, {"nodes/{id}", "patch", "NodeInput", "Node", false}, {"nodes/{id}/packages", "get", "", "PackageData", false}, {"nodes/{id}/findings", "get", "", "Finding", true}, {"nodes/{id}/context", "get", "", "markdown", false}, {"nodes/{id}/pay", "post", "", "Node", false}, {"nodes/{id}/reenroll", "post", "ReenrollInput", "OK", false}, {"attention", "get", "", "Attention", true}, {"search", "get", "", "object", true}, {"findings", "get", "", "Finding", true}, {"findings/{id}/suppress", "post", "SuppressionInput", "OK", false}, {"feed-status", "get", "", "Feed", true}, {"documents", "get", "", "Document", true}, {"documents", "post", "DocumentInput", "Document", false}, {"documents/{id}", "get", "", "Document", false}, {"documents/{id}", "patch", "DocumentInput", "Document", false}, {"documents/{id}/approve", "post", "", "Document", false}, {"documents/{id}/status", "post", "PlanStatusInput", "Document", false}, {"relation-suggestions", "get", "", "RelationSuggestion", true}, {"relations", "get", "", "Relation", true}, {"relations", "post", "RelationInput", "Relation", false}, {"relations/{id}", "delete", "", "OK", false}, {"events", "get", "", "Event", true}, {"tokens", "get", "", "Token", true}, {"tokens", "post", "PrincipalInput", "IssuedToken", false}, {"tokens/{id}", "delete", "", "OK", false}, {"me", "get", "", "Principal", false}, {"settings", "get", "", "Settings", false}}
 	ref := func(name string) any {
 		if name == "object" {
 			return schema{"type": "object"}
@@ -153,8 +156,24 @@ func main() {
 			operation["description"] = "Bounded page. X-Total-Count, X-Page-Limit, X-Page-Offset and optional X-Next-Offset headers describe pagination. Search caps limit at 100. Nodes list contains compact observations; fetch individual node for complete inventory."
 		}
 
-		if r.path == "relation-suggestions" {
-			params = append(params, schema{"name": "node", "in": "query", "schema": schema{"type": "string"}, "description": "Only suggestions touching this node; empty returns all."})
+		query := func(name string, value schema) {
+			params = append(params, schema{"name": name, "in": "query", "schema": value})
+		}
+		if r.method == "get" {
+			switch r.path {
+			case "relation-suggestions", "relations", "documents", "events", "findings":
+				query("node", schema{"type": "string"})
+			case "documents/{id}":
+				query("revision", schema{"type": "integer", "minimum": 1, "description": "Omit to read the current revision"})
+			case "nodes/{id}/packages":
+				query("upgradable", schema{"type": "boolean", "default": false})
+			case "attention":
+				query("filter", schema{"enum": []string{"", "attention", "stale"}})
+				query("sort", schema{"enum": []string{"", "attention", "name"}})
+			case "search":
+				query("q", schema{"type": "string"})
+				query("literal", schema{"type": "boolean", "default": false})
+			}
 		}
 		if strings.Contains(path, "{id}") {
 			params = append(params, schema{"name": "id", "in": "path", "required": true, "schema": schema{"type": "string"}})

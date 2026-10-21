@@ -37,6 +37,28 @@
               "minimum": 0,
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "filter",
+            "schema": {
+              "enum": [
+                "",
+                "attention",
+                "stale"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "schema": {
+              "enum": [
+                "",
+                "attention",
+                "name"
+              ]
+            }
           }
         ],
         "responses": {
@@ -96,6 +118,13 @@
               "default": 0,
               "minimum": 0,
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "node",
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -181,6 +210,15 @@
       "get": {
         "operationId": "get_documents_id",
         "parameters": [
+          {
+            "in": "query",
+            "name": "revision",
+            "schema": {
+              "description": "Omit to read the current revision",
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
           {
             "in": "path",
             "name": "id",
@@ -425,6 +463,13 @@
               "minimum": 0,
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "node",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -545,6 +590,13 @@
               "minimum": 0,
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "node",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -599,7 +651,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object"
+                "$ref": "./models.schema.json#/$defs/SuppressionInput"
               }
             }
           },
@@ -610,7 +662,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "$ref": "./models.schema.json#/$defs/OK"
                 }
               }
             },
@@ -1065,6 +1117,14 @@
             }
           },
           {
+            "in": "query",
+            "name": "upgradable",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          {
             "in": "path",
             "name": "id",
             "required": true,
@@ -1185,7 +1245,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object"
+                "$ref": "./models.schema.json#/$defs/ReenrollInput"
               }
             }
           },
@@ -1196,7 +1256,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "$ref": "./models.schema.json#/$defs/OK"
                 }
               }
             },
@@ -1248,7 +1308,6 @@
             }
           },
           {
-            "description": "Only suggestions touching this node; empty returns all.",
             "in": "query",
             "name": "node",
             "schema": {
@@ -1313,6 +1372,13 @@
               "default": 0,
               "minimum": 0,
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "node",
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -1412,7 +1478,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "$ref": "./models.schema.json#/$defs/OK"
                 }
               }
             },
@@ -1462,6 +1528,21 @@
               "minimum": 0,
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "literal",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -1507,7 +1588,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "$ref": "./models.schema.json#/$defs/Settings"
                 }
               }
             },
@@ -1610,7 +1691,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "$ref": "./models.schema.json#/$defs/IssuedToken"
                 }
               }
             },
@@ -1655,7 +1736,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "$ref": "./models.schema.json#/$defs/OK"
                 }
               }
             },
