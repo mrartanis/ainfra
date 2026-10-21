@@ -397,6 +397,8 @@ func (c *Collector) Collect(ctx context.Context, collectors []string) map[string
 			out[name] = c.Packages(ctx)
 		case "network":
 			out[name] = c.Network(ctx)
+		case "disks":
+			out[name] = c.Disks(ctx)
 		case "wireguard":
 			out[name] = c.WireGuard(ctx)
 		default:

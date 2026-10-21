@@ -5,7 +5,7 @@
   "token_file": "/etc/infra/agent.token",
   "ca_file": "",
   "state_dir": "/var/lib/infra-agent",
-  "collectors": ["os", "packages", "network"],
+  "collectors": ["os", "packages", "network", "disks"],
   "check_files": [],
   "probe_targets": []
 }

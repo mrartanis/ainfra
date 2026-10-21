@@ -4,6 +4,7 @@ import (
 	"ainfra/internal/adapters/sqlite"
 	"ainfra/internal/app"
 	"context"
+	"database/sql"
 	"errors"
 	"path/filepath"
 	"testing"
@@ -53,5 +54,42 @@ func TestPersistenceRollbackFTSBackup(t *testing.T) {
 	defer b.Close()
 	if e = b.Read(ctx, func(tx app.Tx) error { var v map[string]any; return tx.Get("document", "one", &v) }); e != nil {
 		t.Fatal(e)
+	}
+}
+
+func TestRefuseFutureSchema(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "future.db")
+	db, e := sql.Open("sqlite", path)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e = db.Exec("PRAGMA user_version=99"); e != nil {
+		t.Fatal(e)
+	}
+	db.Close()
+	if s, e := sqlite.Open(path); e == nil {
+		s.Close()
+		t.Fatal("silently opened future schema")
+	}
+}
+func TestUpgradeIndexesExistingDocuments(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "old.db")
+	db, e := sql.Open("sqlite", path)
+	if e != nil {
+		t.Fatal(e)
+	}
+	_, e = db.Exec(`CREATE TABLE records(kind TEXT NOT NULL,id TEXT NOT NULL,body TEXT NOT NULL,PRIMARY KEY(kind,id)); INSERT INTO records VALUES('document','old','{"id":"old","title":"Recovery guide","body":"restore backup"}')`)
+	if e != nil {
+		t.Fatal(e)
+	}
+	db.Close()
+	s, e := sqlite.Open(path)
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer s.Close()
+	rows, e := s.Search(context.Background(), "Recovery", false, 10, 0)
+	if e != nil || len(rows) != 1 {
+		t.Fatal(rows, e)
 	}
 }

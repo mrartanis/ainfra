@@ -7,10 +7,12 @@ import (
 	_ "embed"
 	"encoding/json"
 	"errors"
+	"fmt"
 	_ "modernc.org/sqlite"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 //go:embed migrations/001.sql
@@ -39,11 +41,15 @@ func Open(path string) (*Store, error) {
 		return nil, err
 	}
 	db.SetMaxOpenConns(1)
-	for _, q := range []string{"PRAGMA journal_mode=WAL", "PRAGMA busy_timeout=5000", "PRAGMA foreign_keys=ON", migration} {
+	for _, q := range []string{"PRAGMA journal_mode=WAL", "PRAGMA busy_timeout=5000", "PRAGMA foreign_keys=ON"} {
 		if _, err = db.Exec(q); err != nil {
 			db.Close()
 			return nil, err
 		}
+	}
+	if err = migrate(db); err != nil {
+		db.Close()
+		return nil, err
 	}
 	return &Store{db}, nil
 }
@@ -134,4 +140,37 @@ func (s *Store) Backup(ctx context.Context, path string) error {
 		return err
 	}
 	return os.Chmod(path, 0600)
+}
+
+// Serialize migrators on one connection before examining schema state. No
+// older binary may silently accept a newer schema.
+func migrate(db *sql.DB) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	conn, e := db.Conn(ctx)
+	if e != nil {
+		return e
+	}
+	defer conn.Close()
+	if _, e = conn.ExecContext(ctx, "BEGIN IMMEDIATE"); e != nil {
+		return e
+	}
+	defer conn.ExecContext(context.Background(), "ROLLBACK")
+	var version int
+	if e = conn.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version); e != nil {
+		return e
+	}
+	if version > 1 {
+		return fmt.Errorf("database schema %d is newer than supported schema 1", version)
+	}
+	if version == 0 {
+		if _, e = conn.ExecContext(ctx, migration); e != nil {
+			return e
+		}
+		if _, e = conn.ExecContext(ctx, "DELETE FROM search; INSERT INTO search(kind,id,body) SELECT kind,id,body FROM records WHERE kind IN ('node','document'); PRAGMA user_version=1"); e != nil {
+			return e
+		}
+	}
+	_, e = conn.ExecContext(ctx, "COMMIT")
+	return e
 }

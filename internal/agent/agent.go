@@ -54,7 +54,7 @@ func LoadConfig(path string) (c Config, err error) {
 		return c, errors.New("absolute paths required")
 	}
 	if len(c.Collectors) == 0 {
-		c.Collectors = []string{"os", "packages", "network"}
+		c.Collectors = []string{"os", "packages", "network", "disks"}
 	}
 	for _, v := range c.Collectors {
 		if v != "os" && v != "packages" && v != "network" && v != "wireguard" && v != "disks" {
