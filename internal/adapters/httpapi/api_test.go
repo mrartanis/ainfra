@@ -114,3 +114,18 @@ func TestListPaginationBoundsAndStableOrder(t *testing.T) {
 func (brokenStore) CountSearch(context.Context, string, bool) (int, error) {
 	return 0, errors.New("database unavailable")
 }
+
+func TestRelationSuggestionsReadableAndPaginated(t *testing.T) {
+	s := app.New(testkit.NewStore(), time.Now, testkit.IDs())
+	token, _, err := s.IssueToken(context.Background(), domain.Principal{Role: "admin"}, domain.Principal{Role: "reader"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := httptest.NewRequest("GET", "/api/v1/relation-suggestions?limit=1", nil)
+	r.Header.Set("Authorization", "Bearer "+token)
+	w := httptest.NewRecorder()
+	httpapi.New(s).ServeHTTP(w, r)
+	if w.Code != 200 || strings.TrimSpace(w.Body.String()) != "[]" || w.Header().Get("X-Total-Count") != "0" {
+		t.Fatal(w.Code, w.Header(), w.Body.String())
+	}
+}

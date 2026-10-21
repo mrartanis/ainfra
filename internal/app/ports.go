@@ -1,6 +1,7 @@
 package app
 
 import (
+	"ainfra/internal/domain"
 	"context"
 	"encoding/json"
 	"errors"
@@ -13,6 +14,7 @@ var ErrNotFound = errors.New("not_found")
 var ErrInvalid = errors.New("invalid_input")
 
 type Tx interface {
+	TopologyNodes() ([]domain.TopologyNode, error)
 	Get(kind, id string, out any) error
 	Put(kind, id string, value any) error
 	Delete(kind, id string) error

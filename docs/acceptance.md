@@ -8,7 +8,7 @@
 | Persistence | rollback, FTS5/literal, backup, future-schema rejection, upgrade indexing | настоящая SQLite в `internal/adapters/sqlite/*_test.go` |
 | История/retention | age/count caps, latest+approved document revisions, сохранение open findings | `retention_test.go`: возраст, cap свежих events, сохранение approved, rollback при превышении 64 MiB; app test на неизменность resolved_at при heartbeat. Размер БД ограничен max_page_count, WAL/backup требуют запаса диска |
 | Документы/планы | revision conflicts, editor denial, admin approval, edit invalidation | `documents_test.go`, e2e; проверены ошибки чтения evidence, refresh-only heartbeat, реальные version changes, completed/cancelled и права переходов |
-| Узлы/связи/оплата | identity, runs_on cycle, calendar month clamp | app tests; Playwright: VM/host/router/backup, edit/reload, связи в обе стороны |
+| Узлы/связи/оплата | identity, runs_on cycle, calendar month clamp, предложения связей | app tests; предложения только по свежим данным и подтверждённым WG keys, без автоматической записи графа; Playwright: VM/host/router/backup, edit/reload, связи в обе стороны |
 | Агент локально | настоящий Ubuntu 22.04 report, 2863 пакета | `.local` smoke; WG error не скрыт |
 | Дистрибутивы | Debian 12/13, Ubuntu 22.04/24.04/26.04 collectors non-root/offline | [runtime matrix](runtime-matrix.md), pinned Docker images |
 | RouterOS | HTTPS GET/proplist/auth protocol tests | live device not run — устройство/доступ не предоставлены |

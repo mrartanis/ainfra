@@ -274,3 +274,24 @@ func (s *Store) CountSearch(ctx context.Context, q string, literal bool) (count 
 	err = s.readDB.QueryRowContext(ctx, query, q).Scan(&count)
 	return
 }
+
+func (t transaction) TopologyNodes() ([]domain.TopologyNode, error) {
+	rows, err := t.tx.QueryContext(t.ctx, `SELECT json_object('id',id,'name',json_extract(body,'$.name'),'lifecycle',json_extract(body,'$.lifecycle'),'addresses',json_extract(body,'$.addresses'),'wireguard_public_keys',json_extract(body,'$.wireguard_public_keys'),'network',json_extract(body,'$.observations.network'),'wireguard',json_extract(body,'$.observations.wireguard')) FROM records WHERE kind='node' ORDER BY id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []domain.TopologyNode{}
+	for rows.Next() {
+		var raw []byte
+		if err = rows.Scan(&raw); err != nil {
+			return nil, err
+		}
+		var n domain.TopologyNode
+		if err = json.Unmarshal(raw, &n); err != nil {
+			return nil, err
+		}
+		out = append(out, n)
+	}
+	return out, rows.Err()
+}

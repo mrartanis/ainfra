@@ -133,7 +133,7 @@ func (c *Collector) Collect(ctx context.Context, _ []string) map[string]domain.S
 		section.ErrorCode = "resource_format"
 		out["os"] = section
 	}
-	endpoints := []struct{ section, path, fields string }{{"network", "interface", "name,type,mtu,running,disabled"}, {"network", "ip/address", "address,network,interface,disabled"}, {"network", "ip/route", "dst-address,gateway,distance,active"}, {"network", "ipv6/address", "address,interface,disabled"}, {"network", "ipv6/route", "dst-address,gateway,distance,active"}, {"wireguard", "interface/wireguard", "name,public-key,listen-port,mtu,disabled"}, {"wireguard", "interface/wireguard/peers", "interface,public-key,endpoint-address,endpoint-port,allowed-address,last-handshake,rx,tx,disabled"}}
+	endpoints := []struct{ section, path, fields string }{{"network", "interface", "name,type,mtu,running,disabled"}, {"network", "ip/address", "address,network,interface,disabled"}, {"network", "ip/route", "dst-address,gateway,distance,active,routing-table"}, {"network", "ipv6/address", "address,interface,disabled"}, {"network", "ipv6/route", "dst-address,gateway,distance,active,routing-table"}, {"wireguard", "interface/wireguard", "name,public-key,listen-port,mtu,disabled"}, {"wireguard", "interface/wireguard/peers", "interface,public-key,endpoint-address,endpoint-port,allowed-address,last-handshake,rx,tx,disabled"}}
 	data := map[string]map[string]any{"network": {}, "wireguard": {}}
 	bad := map[string]bool{}
 	for _, ep := range endpoints {

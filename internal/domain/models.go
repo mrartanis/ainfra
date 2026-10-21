@@ -40,29 +40,30 @@ type Ack struct {
 	Status string `json:"status"`
 }
 type Node struct {
-	ID              string             `json:"id"`
-	Name            string             `json:"name"`
-	Slug            string             `json:"slug"`
-	Hostname        string             `json:"hostname"`
-	Addresses       []string           `json:"addresses"`
-	Kind            string             `json:"kind"`
-	Lifecycle       string             `json:"lifecycle"`
-	Purpose         string             `json:"purpose"`
-	Criticality     string             `json:"criticality"`
-	Labels          map[string]string  `json:"labels"`
-	Tags            []string           `json:"tags"`
-	Links           map[string]string  `json:"links"`
-	CustomFields    map[string]any     `json:"custom_fields,omitempty"`
-	Revision        int                `json:"revision"`
-	Instance        string             `json:"agent_instance_id,omitempty"`
-	Sequence        uint64             `json:"sequence"`
-	LastReport      time.Time          `json:"last_report"`
-	ReceivedAt      time.Time          `json:"received_at"`
-	Observations    map[string]Section `json:"observations"`
-	CollectorStatus map[string]Section `json:"collector_status"`
-	Services        []Service          `json:"services"`
-	Payment         *Payment           `json:"payment,omitempty"`
-	Backups         []Backup           `json:"backups"`
+	WireGuardPublicKeys []string           `json:"wireguard_public_keys"`
+	ID                  string             `json:"id"`
+	Name                string             `json:"name"`
+	Slug                string             `json:"slug"`
+	Hostname            string             `json:"hostname"`
+	Addresses           []string           `json:"addresses"`
+	Kind                string             `json:"kind"`
+	Lifecycle           string             `json:"lifecycle"`
+	Purpose             string             `json:"purpose"`
+	Criticality         string             `json:"criticality"`
+	Labels              map[string]string  `json:"labels"`
+	Tags                []string           `json:"tags"`
+	Links               map[string]string  `json:"links"`
+	CustomFields        map[string]any     `json:"custom_fields,omitempty"`
+	Revision            int                `json:"revision"`
+	Instance            string             `json:"agent_instance_id,omitempty"`
+	Sequence            uint64             `json:"sequence"`
+	LastReport          time.Time          `json:"last_report"`
+	ReceivedAt          time.Time          `json:"received_at"`
+	Observations        map[string]Section `json:"observations"`
+	CollectorStatus     map[string]Section `json:"collector_status"`
+	Services            []Service          `json:"services"`
+	Payment             *Payment           `json:"payment,omitempty"`
+	Backups             []Backup           `json:"backups"`
 }
 type Service struct {
 	Name         string `json:"name"`
@@ -238,4 +239,25 @@ type Attention struct {
 	Name       string    `json:"name"`
 	Reasons    []string  `json:"reasons"`
 	LastReport time.Time `json:"last_report"`
+}
+
+// TopologyNode deliberately excludes package snapshots from topology queries.
+type TopologyNode struct {
+	ID                  string   `json:"id"`
+	Name                string   `json:"name"`
+	Lifecycle           string   `json:"lifecycle"`
+	Addresses           []string `json:"addresses"`
+	WireGuardPublicKeys []string `json:"wireguard_public_keys"`
+	Network             Section  `json:"network"`
+	WireGuard           Section  `json:"wireguard"`
+}
+type RelationSuggestion struct {
+	ID         string    `json:"id"`
+	Source     string    `json:"source"`
+	Target     string    `json:"target"`
+	Type       string    `json:"type"`
+	Name       string    `json:"name"`
+	Provenance string    `json:"provenance"`
+	ObservedAt time.Time `json:"observed_at"`
+	Evidence   string    `json:"evidence"`
 }

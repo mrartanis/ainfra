@@ -4,6 +4,7 @@ import (
 	"ainfra/internal/domain"
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -138,6 +139,17 @@ func (s *Service) SaveNode(ctx context.Context, p domain.Principal, n domain.Nod
 	}
 	if strings.TrimSpace(n.Name) == "" || len(n.Name) > 200 {
 		return out, ErrInvalid
+	}
+	if len(n.WireGuardPublicKeys) > 32 {
+		return out, ErrInvalid
+	}
+	seenKeys := map[string]bool{}
+	for _, key := range n.WireGuardPublicKeys {
+		raw, e := base64.StdEncoding.DecodeString(key)
+		if e != nil || len(raw) != 32 || base64.StdEncoding.EncodeToString(raw) != key || seenKeys[key] {
+			return out, ErrInvalid
+		}
+		seenKeys[key] = true
 	}
 	err = s.store.Write(ctx, func(tx Tx) error {
 		if n.ID == "" {

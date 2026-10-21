@@ -213,3 +213,38 @@ func TestReadersSeeCommittedSnapshotWhileWriterIsBusy(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestTopologyProjectionPreservesNetworkAndHandlesOldNodes(t *testing.T) {
+	s, e := sqlite.Open(filepath.Join(t.TempDir(), "topology.db"))
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer s.Close()
+	ctx := context.Background()
+	e = s.Write(ctx, func(tx app.Tx) error {
+		if err := tx.Put("node", "legacy", map[string]any{"id": "legacy", "name": "legacy"}); err != nil {
+			return err
+		}
+		return tx.Put("node", "current", domain.Node{ID: "current", Name: "current", WireGuardPublicKeys: []string{"public"}, Observations: map[string]domain.Section{"network": {Status: "ok", Complete: true, Data: json.RawMessage(`{"routes":[]}`)}, "packages": {Data: json.RawMessage(`{"packages":[{"name":"excluded"}]}`)}}})
+	})
+	if e != nil {
+		t.Fatal(e)
+	}
+	e = s.Read(ctx, func(tx app.Tx) error {
+		rows, err := tx.TopologyNodes()
+		if err != nil {
+			return err
+		}
+		if len(rows) != 2 || rows[0].ID != "current" || !rows[0].Network.Complete || len(rows[0].WireGuardPublicKeys) != 1 {
+			t.Fatal(rows)
+		}
+		raw, _ := json.Marshal(rows)
+		if strings.Contains(string(raw), "excluded") {
+			t.Fatal("package payload in topology projection")
+		}
+		return nil
+	})
+	if e != nil {
+		t.Fatal(e)
+	}
+}

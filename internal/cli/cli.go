@@ -19,7 +19,7 @@ const Help = `infractl — клиент HTTP API Infra
   docs search QUERY [--literal] | docs get ID [--revision N]
   docs put --file document.json [--if-revision N]
   docs approve|complete|cancel ID --if-revision N
-  relations list | relations put --file relation.json | relations delete ID
+  relations list | relations suggest [--node ID] | relations put --file relation.json | relations delete ID
   tokens list | tokens issue --file principal.json --output token-file
   tokens revoke ID | feeds status | events | me
   context NODE [--format markdown] | export --output NEW_DIRECTORY
@@ -134,6 +134,9 @@ func Run(ctx context.Context, c *apiclient.Client, args []string, out io.Writer)
 		}
 	case "relations":
 		path = "relations"
+		if at(1) == "suggest" {
+			path = "relation-suggestions?node=" + url.QueryEscape(opts["node"])
+		}
 		if at(1) == "put" {
 			method = "POST"
 		}

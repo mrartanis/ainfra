@@ -1223,6 +1223,74 @@
         }
       }
     },
+    "/api/v1/relation-suggestions": {
+      "get": {
+        "description": "Bounded page. X-Total-Count, X-Page-Limit, X-Page-Offset and optional X-Next-Offset headers describe pagination. Search caps limit at 100. Nodes list contains compact observations; fetch individual node for complete inventory.",
+        "operationId": "get_relation-suggestions",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 100,
+              "maximum": 1000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Only suggestions touching this node; empty returns all.",
+            "in": "query",
+            "name": "node",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "./models.schema.json#/$defs/RelationSuggestion"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Error; credentials and raw stderr are never included"
+          }
+        }
+      }
+    },
     "/api/v1/relations": {
       "get": {
         "description": "Bounded page. X-Total-Count, X-Page-Limit, X-Page-Offset and optional X-Next-Offset headers describe pagination. Search caps limit at 100. Nodes list contains compact observations; fetch individual node for complete inventory.",

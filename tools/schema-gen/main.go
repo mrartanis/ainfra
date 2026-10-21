@@ -73,7 +73,7 @@ func write(path string, v any) {
 	}
 }
 func main() {
-	for _, v := range []any{domain.Report{}, domain.Ack{}, domain.Node{}, domain.Document{}, domain.Principal{}, domain.Token{}, domain.Relation{}, domain.PackageData{}, domain.Finding{}, domain.Feed{}, domain.Attention{}, domain.Event{}} {
+	for _, v := range []any{domain.Report{}, domain.Ack{}, domain.Node{}, domain.Document{}, domain.Principal{}, domain.Token{}, domain.Relation{}, domain.RelationSuggestion{}, domain.PackageData{}, domain.Finding{}, domain.Feed{}, domain.Attention{}, domain.Event{}} {
 		shape(reflect.TypeOf(v))
 	}
 	defs["PlanStatusInput"] = schema{"type": "object", "additionalProperties": false, "required": []string{"status"}, "properties": schema{"status": schema{"enum": []string{"completed", "cancelled"}}}}
@@ -119,7 +119,7 @@ func main() {
 		array                       bool
 	}
 	routes := []route{
-		{"ingest/reports", "post", "Report", "Ack", false}, {"nodes", "get", "", "Node", true}, {"nodes", "post", "NodeInput", "Node", false}, {"nodes/{id}", "get", "", "Node", false}, {"nodes/{id}", "patch", "NodeInput", "Node", false}, {"nodes/{id}/packages", "get", "", "PackageData", false}, {"nodes/{id}/findings", "get", "", "Finding", true}, {"nodes/{id}/context", "get", "", "markdown", false}, {"nodes/{id}/pay", "post", "", "Node", false}, {"nodes/{id}/reenroll", "post", "object", "object", false}, {"attention", "get", "", "Attention", true}, {"search", "get", "", "object", true}, {"findings", "get", "", "Finding", true}, {"findings/{id}/suppress", "post", "object", "object", false}, {"feed-status", "get", "", "Feed", true}, {"documents", "get", "", "Document", true}, {"documents", "post", "DocumentInput", "Document", false}, {"documents/{id}", "get", "", "Document", false}, {"documents/{id}", "patch", "DocumentInput", "Document", false}, {"documents/{id}/approve", "post", "", "Document", false}, {"documents/{id}/status", "post", "PlanStatusInput", "Document", false}, {"relations", "get", "", "Relation", true}, {"relations", "post", "RelationInput", "Relation", false}, {"relations/{id}", "delete", "", "object", false}, {"events", "get", "", "Event", true}, {"tokens", "get", "", "Token", true}, {"tokens", "post", "PrincipalInput", "object", false}, {"tokens/{id}", "delete", "", "object", false}, {"me", "get", "", "Principal", false}, {"settings", "get", "", "object", false}}
+		{"ingest/reports", "post", "Report", "Ack", false}, {"nodes", "get", "", "Node", true}, {"nodes", "post", "NodeInput", "Node", false}, {"nodes/{id}", "get", "", "Node", false}, {"nodes/{id}", "patch", "NodeInput", "Node", false}, {"nodes/{id}/packages", "get", "", "PackageData", false}, {"nodes/{id}/findings", "get", "", "Finding", true}, {"nodes/{id}/context", "get", "", "markdown", false}, {"nodes/{id}/pay", "post", "", "Node", false}, {"nodes/{id}/reenroll", "post", "object", "object", false}, {"attention", "get", "", "Attention", true}, {"search", "get", "", "object", true}, {"findings", "get", "", "Finding", true}, {"findings/{id}/suppress", "post", "object", "object", false}, {"feed-status", "get", "", "Feed", true}, {"documents", "get", "", "Document", true}, {"documents", "post", "DocumentInput", "Document", false}, {"documents/{id}", "get", "", "Document", false}, {"documents/{id}", "patch", "DocumentInput", "Document", false}, {"documents/{id}/approve", "post", "", "Document", false}, {"documents/{id}/status", "post", "PlanStatusInput", "Document", false}, {"relation-suggestions", "get", "", "RelationSuggestion", true}, {"relations", "get", "", "Relation", true}, {"relations", "post", "RelationInput", "Relation", false}, {"relations/{id}", "delete", "", "object", false}, {"events", "get", "", "Event", true}, {"tokens", "get", "", "Token", true}, {"tokens", "post", "PrincipalInput", "object", false}, {"tokens/{id}", "delete", "", "object", false}, {"me", "get", "", "Principal", false}, {"settings", "get", "", "object", false}}
 	ref := func(name string) any {
 		if name == "object" {
 			return schema{"type": "object"}
@@ -153,6 +153,9 @@ func main() {
 			operation["description"] = "Bounded page. X-Total-Count, X-Page-Limit, X-Page-Offset and optional X-Next-Offset headers describe pagination. Search caps limit at 100. Nodes list contains compact observations; fetch individual node for complete inventory."
 		}
 
+		if r.path == "relation-suggestions" {
+			params = append(params, schema{"name": "node", "in": "query", "schema": schema{"type": "string"}, "description": "Only suggestions touching this node; empty returns all."})
+		}
 		if strings.Contains(path, "{id}") {
 			params = append(params, schema{"name": "id", "in": "path", "required": true, "schema": schema{"type": "string"}})
 		}

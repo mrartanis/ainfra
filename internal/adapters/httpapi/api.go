@@ -250,6 +250,8 @@ func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		out, e = a.s.SetPlanStatus(ctx, p, id, revision, v.Status)
 	case parts[0] == "documents" && len(parts) == 3 && parts[2] == "approve" && r.Method == "POST":
 		out, e = a.s.ApprovePlan(ctx, p, id, revision)
+	case path == "relation-suggestions" && read:
+		out, e = a.s.RelationSuggestions(ctx, p, r.URL.Query().Get("node"))
 	case path == "relations" && read:
 		out, e = a.s.Relations(ctx, p)
 	case path == "relations" && r.Method == "POST":

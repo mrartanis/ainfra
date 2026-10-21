@@ -58,6 +58,8 @@ func paginate(w http.ResponseWriter, p pagination, value any) any {
 		return page(w, p, rows)
 	case []domain.Document:
 		return page(w, p, rows)
+	case []domain.RelationSuggestion:
+		return page(w, p, rows)
 	case []domain.Relation:
 		return page(w, p, rows)
 	case []domain.Token:

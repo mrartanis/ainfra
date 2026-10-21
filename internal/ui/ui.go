@@ -292,7 +292,7 @@ func (u *UI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			case "records":
 				requests = append(requests, [2]string{"documents?node=" + id, "Documents"}, [2]string{"events?node=" + id, "Events"})
 			default:
-				requests = append(requests, [2]string{"nodes/" + id + "/findings", "Findings"}, [2]string{"relations?node=" + id, "Relations"}, [2]string{"nodes", "Nodes"}, [2]string{"documents?node=" + id, "Documents"})
+				requests = append(requests, [2]string{"nodes/" + id + "/findings", "Findings"}, [2]string{"relations?node=" + id, "Relations"}, [2]string{"relation-suggestions?node=" + id, "Suggestions"}, [2]string{"nodes", "Nodes"}, [2]string{"documents?node=" + id, "Documents"})
 			}
 			for _, x := range requests {
 				if e := get(x[0], x[1]); e != nil {
@@ -379,6 +379,7 @@ func (u *UI) mutate(ctx context.Context, c *apiclient.Client, r *http.Request, d
 			n[k] = f.Get(k)
 		}
 		n["addresses"] = split(f.Get("addresses"))
+		n["wireguard_public_keys"] = split(f.Get("wireguard_public_keys"))
 		n["tags"] = split(f.Get("tags"))
 		if f.Get("next_due") != "" {
 			due, e := time.Parse("2006-01-02", f.Get("next_due"))

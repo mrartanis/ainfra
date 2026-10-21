@@ -663,9 +663,19 @@
             "array",
             "null"
           ]
+        },
+        "wireguard_public_keys": {
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
         }
       },
       "required": [
+        "wireguard_public_keys",
         "id",
         "name",
         "slug",
@@ -820,6 +830,15 @@
           "type": "string"
         },
         "tags": {
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "wireguard_public_keys": {
           "items": {
             "type": "string"
           },
@@ -1138,6 +1157,47 @@
         "source",
         "target",
         "type"
+      ],
+      "type": "object"
+    },
+    "RelationSuggestion": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "observed_at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "provenance": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "target": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "source",
+        "target",
+        "type",
+        "name",
+        "provenance",
+        "observed_at",
+        "evidence"
       ],
       "type": "object"
     },

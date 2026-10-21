@@ -2,6 +2,7 @@ package testkit
 
 import (
 	"ainfra/internal/app"
+	"ainfra/internal/domain"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -129,4 +130,20 @@ func (t tx) ListNode(kind, node string) ([]json.RawMessage, error) {
 func (s *Store) CountSearch(ctx context.Context, q string, literal bool) (int, error) {
 	rows, e := s.Search(ctx, q, literal, int(^uint(0)>>1), 0)
 	return len(rows), e
+}
+
+func (t tx) TopologyNodes() ([]domain.TopologyNode, error) {
+	rows, err := t.List("node")
+	if err != nil {
+		return nil, err
+	}
+	out := []domain.TopologyNode{}
+	for _, raw := range rows {
+		var n domain.Node
+		if err = json.Unmarshal(raw, &n); err != nil {
+			return nil, err
+		}
+		out = append(out, domain.TopologyNode{ID: n.ID, Name: n.Name, Lifecycle: n.Lifecycle, Addresses: n.Addresses, WireGuardPublicKeys: n.WireGuardPublicKeys, Network: n.Observations["network"], WireGuard: n.Observations["wireguard"]})
+	}
+	return out, nil
 }
