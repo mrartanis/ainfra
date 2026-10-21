@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -15,9 +16,15 @@ import (
 
 const MaxBody = 16 << 20
 
-type API struct{ s *app.Service }
+type API struct {
+	s      *app.Service
+	logger *slog.Logger
+}
 
-func New(s *app.Service) http.Handler { return &API{s} }
+func New(s *app.Service) http.Handler { return NewWithLogger(s, nil) }
+func NewWithLogger(s *app.Service, logger *slog.Logger) http.Handler {
+	return &API{s: s, logger: logger}
+}
 func write(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
@@ -66,10 +73,9 @@ func decode(w http.ResponseWriter, r *http.Request, v any) error {
 	}
 	return nil
 }
-func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (a *API) serve(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Cache-Control", "no-store")
-	w.Header().Set("X-Request-ID", app.RandomID())
 	w.Header().Set("Content-Security-Policy", "default-src 'none'")
 	if r.URL.Path == "/readyz" && r.Method == "GET" {
 		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)

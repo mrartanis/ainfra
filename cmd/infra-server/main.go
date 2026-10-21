@@ -12,7 +12,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -24,8 +24,9 @@ import (
 )
 
 func main() {
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, nil)))
 	if e := run(); e != nil {
-		log.Print(e)
+		slog.Error("command failed", "error", e.Error())
 		os.Exit(1)
 	}
 }
@@ -132,7 +133,7 @@ func run() error {
 					return
 				case <-ticker.C:
 					if _, err := store.Prune(ctx, policy, time.Now()); err != nil {
-						log.Print("retention cleanup failed")
+						slog.Error("retention cleanup failed")
 					}
 				}
 			}
@@ -143,7 +144,7 @@ func run() error {
 				defer workers.Done()
 				for {
 					if err := syncFeeds(ctx, svc, filepath.Join(filepath.Dir(*db), "feed-staging")); err != nil {
-						log.Print("feed sync failed; previous snapshot retained")
+						slog.Error("feed sync failed; previous snapshot retained")
 					}
 					select {
 					case <-ctx.Done():
@@ -153,8 +154,8 @@ func run() error {
 				}
 			}()
 		}
-		server := &http.Server{Addr: *listen, Handler: httpapi.New(svc), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 35 * time.Second, WriteTimeout: 35 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 << 10}
-		log.Printf("API listening on http://%s", listener.Addr())
+		server := &http.Server{Addr: *listen, Handler: httpapi.NewWithLogger(svc, slog.Default()), ErrorLog: slog.NewLogLogger(slog.Default().Handler(), slog.LevelError), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 35 * time.Second, WriteTimeout: 35 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 << 10}
+		slog.Info("API listening", "address", listener.Addr().String(), "transport", "http")
 		return serveUntilCancelled(ctx, server, listener)
 	default:
 		return fmt.Errorf("commands: serve, bootstrap, create-node, backup, sync-feeds, prune, version")

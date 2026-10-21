@@ -2,6 +2,7 @@ package app
 
 import (
 	"ainfra/internal/domain"
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
@@ -116,6 +117,17 @@ func (s *Service) IngestReport(ctx context.Context, p domain.Principal, r domain
 			n.CollectorStatus = map[string]domain.Section{}
 		}
 		for k, v := range r.Collectors {
+			// Hash facts independently of freshness metadata, never trust a supplied digest.
+			v.ContentHash = ""
+			if len(v.Data) > 0 {
+				decoder := json.NewDecoder(bytes.NewReader(v.Data))
+				decoder.UseNumber()
+				var content any
+				if e := decoder.Decode(&content); e != nil {
+					return ErrInvalid
+				}
+				v.ContentHash = hash(content)
+			}
 			status := v
 			status.Data = nil
 			n.CollectorStatus[k] = status

@@ -19,11 +19,12 @@ type Token struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 type Section struct {
-	Status     string          `json:"status"`
-	Complete   bool            `json:"complete"`
-	ObservedAt time.Time       `json:"observed_at"`
-	Data       json.RawMessage `json:"data,omitempty"`
-	ErrorCode  string          `json:"error_code,omitempty"`
+	ContentHash string          `json:"content_hash,omitempty"`
+	Status      string          `json:"status"`
+	Complete    bool            `json:"complete"`
+	ObservedAt  time.Time       `json:"observed_at"`
+	Data        json.RawMessage `json:"data,omitempty"`
+	ErrorCode   string          `json:"error_code,omitempty"`
 }
 type Report struct {
 	SchemaVersion int                `json:"schema_version"`

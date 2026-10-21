@@ -23,11 +23,27 @@ func main() {
 		os.Exit(1)
 	}
 }
+
+const usage = "commands: collect, push, run, probe, check (alias of check-config), check-config, snapshot-wireguard, refresh-apt, version"
+
 func run() error {
 	if len(os.Args) < 2 {
-		return fmt.Errorf("commands: collect, push, run, check-config, version")
+		return fmt.Errorf("%s", usage)
 	}
 	cmd := os.Args[1]
+	if cmd == "help" || cmd == "--help" || cmd == "-h" {
+		fmt.Println(usage)
+		return nil
+	}
+	if cmd == "check" {
+		cmd = "check-config"
+	}
+	switch cmd {
+	case "collect", "push", "run", "probe", "check-config", "snapshot-wireguard", "refresh-apt", "version":
+	default:
+		return fmt.Errorf("unknown command; use infra-agent help")
+	}
+
 	f := flag.NewFlagSet("infra-agent "+cmd, flag.ContinueOnError)
 	config := f.String("config", "/etc/infra/agent.json", "config JSON")
 	file := f.String("file", "", "report file")
@@ -35,6 +51,9 @@ func run() error {
 	refreshState := f.String("refresh-state", linuxcollect.APTRefreshPath, "managed APT refresh result path")
 	f.Bool("json", false, "JSON output")
 	if e := f.Parse(os.Args[2:]); e != nil {
+		if e == flag.ErrHelp {
+			return nil
+		}
 		return e
 	}
 	if cmd == "version" {

@@ -101,3 +101,5 @@ Helper вызывает только фиксированные `wg show all pub
 
 
 Редактирование ручного графика оплаты сохраняет LastPaid и остальные поля; существующие значения заполняются в форме. Дата интерпретируется в указанном IANA timezone (по умолчанию UTC), а не принудительно в UTC. Недопустимые recurrence/timezone отвергаются до записи. Сервер и UI включают стандартную Go timezone database, поэтому установленный системный пакет tzdata не обязателен. «Оплатил» сдвигает график на один период, ограничивая день концом целевого месяца; просроченные неоплаченные периоды не скрываются автоматически.
+
+Сервер пишет JSON-логи в stderr: lifecycle/background events и HTTP method/status/duration_ms/request_id. Request ID генерируется сервером и возвращается в X-Request-ID. URL, query, headers, body и credentials в access log не записываются. Хранение stderr/journald ограничивает supervisor; SQLite retention не является лимитом файлов логов. Агент поддерживает `help`/`--help` без конфигурации; `check` — alias `check-config`, проверяет конфигурацию без подключения и чтения token file.

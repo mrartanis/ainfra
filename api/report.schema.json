@@ -2070,6 +2070,9 @@
         "complete": {
           "type": "boolean"
         },
+        "content_hash": {
+          "type": "string"
+        },
         "data": {},
         "error_code": {
           "maxLength": 128,
