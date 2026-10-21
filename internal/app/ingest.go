@@ -37,7 +37,17 @@ func (s *Service) IngestReport(ctx context.Context, p domain.Principal, r domain
 	if r.SchemaVersion != 1 || r.ID == "" || len(r.ID) > 100 || r.Sequence == 0 || r.ObservedAt.IsZero() || r.ObservedAt.After(s.now().Add(5*time.Minute)) || len(r.Collectors) > 16 {
 		return ack, ErrInvalid
 	}
+	totalBytes := 0
 	for name, section := range r.Collectors {
+		totalBytes += len(section.Data)
+		if totalBytes > 16<<20 || len(section.ErrorCode) > 128 {
+			return ack, ErrInvalid
+		}
+		if len(section.Data) > 0 {
+			if e := validateObservation(name, section.Data); e != nil {
+				return ack, e
+			}
+		}
 		if name == "checks" && len(section.Data) > 0 {
 			if e := ValidateChecks(section.Data); e != nil {
 				return ack, e

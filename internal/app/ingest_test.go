@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 )
@@ -80,5 +81,36 @@ func TestIngestOwnershipOrderingAndPartial(t *testing.T) {
 	r.ID = "report5"
 	if _, err = svc.IngestReport(ctx, p, r); !errors.Is(err, app.ErrForbidden) {
 		t.Fatal("cross-node write allowed")
+	}
+}
+
+func TestReportRejectsUnsafeOrUnboundedSectionPayload(t *testing.T) {
+	now := time.Now().UTC()
+	ctx := context.Background()
+	svc := app.New(testkit.NewStore(), func() time.Time { return now }, testkit.IDs())
+	n, err := svc.SaveNode(ctx, domain.Principal{Role: "admin"}, domain.Node{Name: "node"}, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	principal := domain.Principal{Role: "agent", Instance: "agent", Nodes: []string{n.ID}}
+	cases := []struct {
+		name string
+		data string
+	}{
+		{"os", `{"id":"debian","password":"private"}`},
+		{"packages", `{"packages":[{"name":"pkg","version":"1","private_key":"private"}]}`},
+		{"wireguard", `{"private-key":"private"}`},
+		{"network", `{"routes":[{"nested":{"preshared_key":"private"}}]}`},
+		{"network", `"not an observation object"`},
+		{"network", `{"nested":` + strings.Repeat("[", 20) + "0" + strings.Repeat("]", 20) + "}"},
+		{"wireguard", `{"peers":"` + strings.Repeat("x", (1<<20)+1) + `"}`},
+	}
+	for _, test := range cases {
+		t.Run(test.name+test.data[:5], func(t *testing.T) {
+			r := domain.Report{SchemaVersion: 1, ID: "r", NodeID: n.ID, Instance: "agent", Sequence: 1, ObservedAt: now, Collectors: map[string]domain.Section{test.name: {Status: "ok", Complete: true, ObservedAt: now, Data: json.RawMessage(test.data)}}}
+			if _, err := svc.IngestReport(ctx, principal, r); !errors.Is(err, app.ErrInvalid) {
+				t.Fatal("invalid payload accepted", err)
+			}
+		})
 	}
 }
