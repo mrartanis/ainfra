@@ -1,0 +1,1181 @@
+{
+  "$defs": {
+    "Ack": {
+      "additionalProperties": false,
+      "properties": {
+        "report_id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "report_id",
+        "status"
+      ],
+      "type": "object"
+    },
+    "Advisory": {
+      "additionalProperties": false,
+      "properties": {
+        "channel": {
+          "type": "string"
+        },
+        "distro": {
+          "type": "string"
+        },
+        "fixed": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "introduced": {
+          "type": "string"
+        },
+        "native_id": {
+          "type": "string"
+        },
+        "notes": {
+          "type": "string"
+        },
+        "provider": {
+          "type": "string"
+        },
+        "release": {
+          "type": "string"
+        },
+        "severity": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "withdrawn": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "native_id",
+        "provider",
+        "distro",
+        "release",
+        "channel",
+        "source",
+        "introduced",
+        "fixed",
+        "status",
+        "severity",
+        "notes",
+        "url",
+        "withdrawn"
+      ],
+      "type": "object"
+    },
+    "Attention": {
+      "additionalProperties": false,
+      "properties": {
+        "last_report": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "node_id": {
+          "type": "string"
+        },
+        "reasons": {
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "node_id",
+        "name",
+        "reasons",
+        "last_report"
+      ],
+      "type": "object"
+    },
+    "Backup": {
+      "additionalProperties": false,
+      "properties": {
+        "destination": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "string"
+        },
+        "grace_hours": {
+          "type": "integer"
+        },
+        "id": {
+          "type": "string"
+        },
+        "interval_hours": {
+          "type": "integer"
+        },
+        "label": {
+          "type": "string"
+        },
+        "last_attempt_at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "last_attempt_status": {
+          "type": "string"
+        },
+        "last_restore_test_at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "last_success_at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "observed_at": {
+          "format": "date-time",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "destination",
+        "label",
+        "interval_hours",
+        "grace_hours",
+        "last_attempt_at",
+        "last_success_at",
+        "last_attempt_status",
+        "last_restore_test_at",
+        "observed_at",
+        "evidence"
+      ],
+      "type": "object"
+    },
+    "Document": {
+      "additionalProperties": false,
+      "properties": {
+        "approved_hash": {
+          "type": "string"
+        },
+        "approved_revision": {
+          "type": "integer"
+        },
+        "approver": {
+          "type": "string"
+        },
+        "author": {
+          "type": "string"
+        },
+        "body": {
+          "type": "string"
+        },
+        "evidence_hash": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "needs_revalidation": {
+          "type": "boolean"
+        },
+        "nodes": {
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "revision": {
+          "type": "integer"
+        },
+        "status": {
+          "type": "string"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "updated_at": {
+          "format": "date-time",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "kind",
+        "body",
+        "nodes",
+        "tags",
+        "revision",
+        "author",
+        "updated_at",
+        "status",
+        "approved_revision",
+        "needs_revalidation"
+      ],
+      "type": "object"
+    },
+    "DocumentInput": {
+      "additionalProperties": false,
+      "properties": {
+        "approved_hash": {
+          "readOnly": true,
+          "type": "string"
+        },
+        "approved_revision": {
+          "readOnly": true,
+          "type": "integer"
+        },
+        "approver": {
+          "readOnly": true,
+          "type": "string"
+        },
+        "author": {
+          "readOnly": true,
+          "type": "string"
+        },
+        "body": {
+          "type": "string"
+        },
+        "evidence_hash": {
+          "readOnly": true,
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "needs_revalidation": {
+          "readOnly": true,
+          "type": "boolean"
+        },
+        "nodes": {
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "revision": {
+          "type": "integer"
+        },
+        "status": {
+          "readOnly": true,
+          "type": "string"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "updated_at": {
+          "format": "date-time",
+          "readOnly": true,
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "kind",
+        "body"
+      ],
+      "type": "object"
+    },
+    "Event": {
+      "additionalProperties": false,
+      "properties": {
+        "actor": {
+          "type": "string"
+        },
+        "at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "detail": {
+          "type": "string"
+        },
+        "entity": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "entity",
+        "actor",
+        "at",
+        "detail"
+      ],
+      "type": "object"
+    },
+    "Feed": {
+      "additionalProperties": false,
+      "properties": {
+        "count": {
+          "type": "integer"
+        },
+        "error": {
+          "type": "string"
+        },
+        "etag": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "last_attempt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "last_source_modified": {
+          "type": "string"
+        },
+        "last_successful_sync": {
+          "format": "date-time",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "last_attempt",
+        "last_successful_sync",
+        "last_source_modified",
+        "etag",
+        "count"
+      ],
+      "type": "object"
+    },
+    "Finding": {
+      "additionalProperties": false,
+      "properties": {
+        "advisory": {
+          "$ref": "#/$defs/Advisory"
+        },
+        "assessment": {
+          "type": "string"
+        },
+        "feed_at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "first_seen": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "inventory_at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "last_evaluated": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "node_id": {
+          "type": "string"
+        },
+        "packages": {
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "reason": {
+          "type": "string"
+        },
+        "remediation": {
+          "type": "string"
+        },
+        "suppressed_until": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "workflow": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "node_id",
+        "advisory",
+        "packages",
+        "assessment",
+        "remediation",
+        "workflow",
+        "reason",
+        "suppressed_until",
+        "first_seen",
+        "last_evaluated",
+        "inventory_at",
+        "feed_at"
+      ],
+      "type": "object"
+    },
+    "Node": {
+      "additionalProperties": false,
+      "properties": {
+        "addresses": {
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "agent_instance_id": {
+          "type": "string"
+        },
+        "backups": {
+          "items": {
+            "$ref": "#/$defs/Backup"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "collector_status": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Section"
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "criticality": {
+          "type": "string"
+        },
+        "custom_fields": {
+          "additionalProperties": {},
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "hostname": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "last_report": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "lifecycle": {
+          "type": "string"
+        },
+        "links": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "observations": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Section"
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "payment": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Payment"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "purpose": {
+          "type": "string"
+        },
+        "received_at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "revision": {
+          "type": "integer"
+        },
+        "sequence": {
+          "type": "integer"
+        },
+        "services": {
+          "items": {
+            "$ref": "#/$defs/Service"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "slug": {
+          "type": "string"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "slug",
+        "hostname",
+        "addresses",
+        "kind",
+        "lifecycle",
+        "purpose",
+        "criticality",
+        "labels",
+        "tags",
+        "links",
+        "revision",
+        "sequence",
+        "last_report",
+        "received_at",
+        "observations",
+        "collector_status",
+        "services",
+        "backups"
+      ],
+      "type": "object"
+    },
+    "NodeInput": {
+      "additionalProperties": false,
+      "properties": {
+        "addresses": {
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "agent_instance_id": {
+          "readOnly": true,
+          "type": "string"
+        },
+        "backups": {
+          "items": {
+            "$ref": "#/$defs/Backup"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "collector_status": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Section"
+          },
+          "readOnly": true,
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "criticality": {
+          "type": "string"
+        },
+        "custom_fields": {
+          "additionalProperties": {},
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "hostname": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "last_report": {
+          "format": "date-time",
+          "readOnly": true,
+          "type": "string"
+        },
+        "lifecycle": {
+          "type": "string"
+        },
+        "links": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "observations": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Section"
+          },
+          "readOnly": true,
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "payment": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Payment"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "purpose": {
+          "type": "string"
+        },
+        "received_at": {
+          "format": "date-time",
+          "readOnly": true,
+          "type": "string"
+        },
+        "revision": {
+          "type": "integer"
+        },
+        "sequence": {
+          "readOnly": true,
+          "type": "integer"
+        },
+        "services": {
+          "items": {
+            "$ref": "#/$defs/Service"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "slug": {
+          "type": "string"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "Package": {
+      "additionalProperties": false,
+      "properties": {
+        "arch": {
+          "type": "string"
+        },
+        "blocked_reason": {
+          "type": "string"
+        },
+        "candidate": {
+          "type": "string"
+        },
+        "candidate_source": {
+          "type": "string"
+        },
+        "candidate_source_version": {
+          "type": "string"
+        },
+        "held": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string"
+        },
+        "origin": {
+          "type": "string"
+        },
+        "origin_evidence": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "source_version": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "suite": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "arch",
+        "version",
+        "source",
+        "source_version",
+        "state",
+        "candidate",
+        "candidate_source",
+        "candidate_source_version",
+        "origin",
+        "origin_evidence",
+        "suite",
+        "held",
+        "blocked_reason"
+      ],
+      "type": "object"
+    },
+    "PackageData": {
+      "additionalProperties": false,
+      "properties": {
+        "metadata_status": {
+          "type": "string"
+        },
+        "packages": {
+          "items": {
+            "$ref": "#/$defs/Package"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "simulation": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "packages",
+        "metadata_status",
+        "simulation"
+      ],
+      "type": "object"
+    },
+    "Payment": {
+      "additionalProperties": false,
+      "properties": {
+        "amount": {
+          "type": "string"
+        },
+        "currency": {
+          "type": "string"
+        },
+        "interval": {
+          "type": "integer"
+        },
+        "last_paid": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "next_due": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "note": {
+          "type": "string"
+        },
+        "timezone": {
+          "type": "string"
+        },
+        "unit": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "next_due",
+        "interval",
+        "unit",
+        "timezone",
+        "amount",
+        "currency",
+        "note",
+        "last_paid"
+      ],
+      "type": "object"
+    },
+    "Principal": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "instance": {
+          "type": "string"
+        },
+        "nodes": {
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "role": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "role"
+      ],
+      "type": "object"
+    },
+    "PrincipalInput": {
+      "additionalProperties": false,
+      "properties": {
+        "instance": {
+          "type": "string"
+        },
+        "nodes": {
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "role": {
+          "enum": [
+            "reader",
+            "editor",
+            "agent",
+            "probe",
+            "admin"
+          ]
+        }
+      },
+      "required": [
+        "role"
+      ],
+      "type": "object"
+    },
+    "Relation": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "provenance": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "integer"
+        },
+        "source": {
+          "type": "string"
+        },
+        "target": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "source",
+        "target",
+        "type",
+        "name",
+        "provenance",
+        "revision"
+      ],
+      "type": "object"
+    },
+    "RelationInput": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "provenance": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "integer"
+        },
+        "source": {
+          "type": "string"
+        },
+        "target": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "source",
+        "target",
+        "type"
+      ],
+      "type": "object"
+    },
+    "Report": {
+      "additionalProperties": false,
+      "properties": {
+        "agent_instance_id": {
+          "maxLength": 100,
+          "minLength": 1,
+          "type": "string"
+        },
+        "agent_version": {
+          "type": "string"
+        },
+        "collectors": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Section"
+          },
+          "maxProperties": 16,
+          "propertyNames": {
+            "enum": [
+              "os",
+              "packages",
+              "network",
+              "wireguard",
+              "disks",
+              "checks"
+            ]
+          },
+          "type": "object"
+        },
+        "node_id": {
+          "maxLength": 100,
+          "minLength": 1,
+          "type": "string"
+        },
+        "observed_at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "report_id": {
+          "maxLength": 100,
+          "minLength": 1,
+          "type": "string"
+        },
+        "schema_version": {
+          "const": 1
+        },
+        "sequence": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "schema_version",
+        "report_id",
+        "node_id",
+        "agent_instance_id",
+        "sequence",
+        "observed_at",
+        "agent_version",
+        "collectors"
+      ],
+      "type": "object"
+    },
+    "Section": {
+      "additionalProperties": false,
+      "properties": {
+        "complete": {
+          "type": "boolean"
+        },
+        "data": {},
+        "error_code": {
+          "type": "string"
+        },
+        "observed_at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "ok",
+            "partial",
+            "error",
+            "unsupported",
+            "disabled"
+          ]
+        }
+      },
+      "required": [
+        "status",
+        "complete",
+        "observed_at"
+      ],
+      "type": "object"
+    },
+    "Service": {
+      "additionalProperties": false,
+      "properties": {
+        "exposure": {
+          "type": "string"
+        },
+        "instructions": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "primary": {
+          "type": "boolean"
+        },
+        "purpose": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "url",
+        "purpose",
+        "exposure",
+        "primary",
+        "instructions"
+      ],
+      "type": "object"
+    },
+    "Token": {
+      "additionalProperties": false,
+      "properties": {
+        "created_at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "principal": {
+          "$ref": "#/$defs/Principal"
+        },
+        "revoked": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "principal",
+        "revoked",
+        "created_at"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://infra.invalid/report.schema.json",
+  "$ref": "#/$defs/Report",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

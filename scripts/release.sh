@@ -14,7 +14,7 @@ for platform in linux/amd64 linux/arm64 darwin/arm64; do
     for command in $commands; do
         GOOS="$os" GOARCH="$arch" CGO_ENABLED=0 "$GO" build -trimpath -ldflags='-s -w' -o "$staging/$name/bin/$command" "./cmd/$command"
     done
-    cp -R packaging docs skills "$staging/$name/"
+    cp -R packaging docs skills api "$staging/$name/"
     cp README.md go.mod go.sum "$staging/$name/"
     "$GO" list -m all > "$staging/$name/dependencies.txt"
     tar -czf "dist/$name.tar.gz" -C "$staging" "$name"
