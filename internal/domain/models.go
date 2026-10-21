@@ -207,7 +207,13 @@ type Advisory struct {
 	URL        string          `json:"url"`
 	Withdrawn  bool            `json:"withdrawn"`
 }
+
+// FeedFormatVersion changes when persisted normalization or coverage metadata changes.
+const FeedFormatVersion = 1
+
 type Feed struct {
+	FormatVersion  int       `json:"format_version"`
+	Releases       []string  `json:"releases"`
 	ID             string    `json:"id"`
 	LastAttempt    time.Time `json:"last_attempt"`
 	LastSuccess    time.Time `json:"last_successful_sync"`

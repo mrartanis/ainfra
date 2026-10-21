@@ -201,12 +201,12 @@ func (s *Service) Attention(ctx context.Context, p domain.Principal) (out []doma
 		_ = json.Unmarshal(n.Observations["os"].Data, &os)
 		covered := false
 		for _, feed := range feeds {
-			if feed.ID == os.ID && !feed.LastSuccess.IsZero() {
+			if feed.ID == os.ID && !feed.LastSuccess.IsZero() && (contains(feed.Releases, os.Version) || contains(feed.Releases, os.Codename)) {
 				covered = true
 			}
 		}
 		if !covered {
-			a.Reasons = append(a.Reasons, "CVE: нет покрытия для ОС "+os.ID)
+			a.Reasons = append(a.Reasons, "CVE: покрытие релиза не подтверждено — "+os.ID+" "+os.Version+" "+os.Codename)
 		}
 		var pd domain.PackageData
 		_ = json.Unmarshal(pk.Data, &pd)

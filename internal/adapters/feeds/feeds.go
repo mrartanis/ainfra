@@ -294,10 +294,10 @@ func (s Source) FetchTo(ctx context.Context, previous domain.Feed, emit func(dom
 	if e != nil {
 		return Snapshot{}, e
 	}
-	if previous.ETag != "" {
+	if previous.FormatVersion == domain.FeedFormatVersion && previous.ETag != "" {
 		req.Header.Set("If-None-Match", previous.ETag)
 	}
-	if previous.SourceModified != "" {
+	if previous.FormatVersion == domain.FeedFormatVersion && previous.SourceModified != "" {
 		req.Header.Set("If-Modified-Since", previous.SourceModified)
 	}
 	resp, e := s.HTTP.Do(req)

@@ -97,6 +97,8 @@ func (s *Service) SyncSnapshot(ctx context.Context, id string, snapshot Advisory
 		f.ETag = etag
 		f.SourceModified = modified
 		f.Count = 0
+		f.FormatVersion = domain.FeedFormatVersion
+		releases := map[string]bool{}
 		var previous []string
 		if e := tx.Get("feed-sources", id, &previous); e != nil && e != ErrNotFound {
 			return e
@@ -110,6 +112,11 @@ func (s *Service) SyncSnapshot(ctx context.Context, id string, snapshot Advisory
 			current[source] = true
 			keys = append(keys, source)
 			f.Count += len(records)
+			for _, a := range records {
+				if a.Distro == id && a.Release != "" {
+					releases[strings.TrimSuffix(a.Release, ":LTS")] = true
+				}
+			}
 			return tx.Put("advisory:"+id, source, records)
 		}); e != nil {
 			return e
@@ -130,6 +137,11 @@ func (s *Service) SyncSnapshot(ctx context.Context, id string, snapshot Advisory
 		if e := tx.Delete("advisories", id); e != nil {
 			return e
 		}
+		f.Releases = make([]string, 0, len(releases))
+		for release := range releases {
+			f.Releases = append(f.Releases, release)
+		}
+		sort.Strings(f.Releases)
 		if e := tx.Put("feed", id, f); e != nil {
 			return e
 		}

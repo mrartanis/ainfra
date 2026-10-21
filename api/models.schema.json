@@ -566,6 +566,9 @@
         "etag": {
           "type": "string"
         },
+        "format_version": {
+          "type": "integer"
+        },
         "id": {
           "type": "string"
         },
@@ -579,9 +582,20 @@
         "last_successful_sync": {
           "format": "date-time",
           "type": "string"
+        },
+        "releases": {
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
         }
       },
       "required": [
+        "format_version",
+        "releases",
         "id",
         "last_attempt",
         "last_successful_sync",

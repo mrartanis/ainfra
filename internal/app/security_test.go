@@ -187,3 +187,45 @@ func TestCandidateNeedsMatchingVendorAndReleaseEvidence(t *testing.T) {
 		}
 	}
 }
+
+func TestCoverageRequiresObservedReleaseInFeed(t *testing.T) {
+	now := time.Now().UTC()
+	ctx := context.Background()
+	svc := app.New(testkit.NewStore(), func() time.Time { return now }, testkit.IDs())
+	admin := domain.Principal{Role: "admin"}
+	n, _ := svc.SaveNode(ctx, admin, domain.Node{Name: "uncovered-release"}, 0)
+	r := domain.Report{SchemaVersion: 1, ID: "r", NodeID: n.ID, Instance: "i", Sequence: 1, ObservedAt: now, Collectors: map[string]domain.Section{"os": {Status: "ok", Complete: true, ObservedAt: now, Data: json.RawMessage(`{"id":"ubuntu","version":"99.04","codename":"future"}`)}}}
+	if _, err := svc.IngestReport(ctx, domain.Principal{Role: "agent", Instance: "i", Nodes: []string{n.ID}}, r); err != nil {
+		t.Fatal(err)
+	}
+	advisory := domain.Advisory{ID: "CVE-fixture", Provider: "ubuntu", Distro: "ubuntu", Release: "24.04:LTS", Source: "fixture"}
+	if err := svc.SyncFeed(ctx, "ubuntu", []domain.Advisory{advisory}, "", "", nil); err != nil {
+		t.Fatal(err)
+	}
+	rows, err := svc.Attention(ctx, admin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, reason := range rows[0].Reasons {
+		if strings.Contains(reason, "CVE:") && strings.Contains(reason, "99.04") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("missing release coverage warning", rows)
+	}
+	advisory.Release = "99.04:LTS"
+	if err = svc.SyncFeed(ctx, "ubuntu", []domain.Advisory{advisory}, "", "", nil); err != nil {
+		t.Fatal(err)
+	}
+	rows, err = svc.Attention(ctx, admin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, reason := range rows[0].Reasons {
+		if strings.Contains(reason, "CVE:") && strings.Contains(reason, "99.04") {
+			t.Fatal("confirmed release ignored", rows)
+		}
+	}
+}
