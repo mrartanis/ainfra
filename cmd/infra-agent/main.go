@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"syscall"
 	"time"
 )
 
@@ -30,6 +31,7 @@ func run() error {
 	f := flag.NewFlagSet("infra-agent "+cmd, flag.ContinueOnError)
 	config := f.String("config", "/etc/infra/agent.json", "config JSON")
 	file := f.String("file", "", "report file")
+	refreshState := f.String("refresh-state", linuxcollect.APTRefreshPath, "managed APT refresh result path")
 	f.Bool("json", false, "JSON output")
 	if e := f.Parse(os.Args[2:]); e != nil {
 		return e
@@ -37,6 +39,9 @@ func run() error {
 	if cmd == "version" {
 		fmt.Println("infra-agent 0.1.0")
 		return nil
+	}
+	if cmd == "refresh-apt" {
+		return refreshAPT(*refreshState)
 	}
 	c, e := agent.LoadConfig(*config)
 	if e != nil {
@@ -122,4 +127,31 @@ func run() error {
 	default:
 		return fmt.Errorf("unknown command")
 	}
+}
+
+func refreshAPT(path string) error {
+	if !filepath.IsAbs(path) {
+		return fmt.Errorf("refresh state path must be absolute")
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return err
+	}
+	lock, err := os.OpenFile(path+".lock", os.O_CREATE|os.O_RDWR, 0600)
+	if err != nil {
+		return err
+	}
+	defer lock.Close()
+	if err = syscall.Flock(int(lock.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		return fmt.Errorf("APT refresh already running")
+	}
+	defer syscall.Flock(int(lock.Fd()), syscall.LOCK_UN)
+	ctx, cancel := context.WithTimeout(context.Background(), 14*time.Minute)
+	defer cancel()
+	write := func(path string, b []byte) error {
+		if err := agent.AtomicWrite(path, b); err != nil {
+			return err
+		}
+		return os.Chmod(path, 0644) // Status only; readable by the unprivileged collector.
+	}
+	return linuxcollect.RefreshAPT(ctx, linuxcollect.ExecRunner{Timeout: 14 * time.Minute}, os.ReadFile, write, time.Now, path)
 }

@@ -31,10 +31,14 @@ func (b *bounded) Write(p []byte) (int, error) {
 	return b.Buffer.Write(p)
 }
 
-type ExecRunner struct{}
+type ExecRunner struct{ Timeout time.Duration }
 
-func (ExecRunner) Run(ctx context.Context, name string, args ...string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+func (r ExecRunner) Run(ctx context.Context, name string, args ...string) ([]byte, error) {
+	timeout := r.Timeout
+	if timeout <= 0 {
+		timeout = 30 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Env = append(os.Environ(), "LC_ALL=C", "LANG=C", "PAGER=cat", "DPKG_PAGER=cat")
@@ -148,7 +152,7 @@ func (c *Collector) Packages(ctx context.Context) domain.Section {
 	if e != nil {
 		return failed("dpkg_format")
 	}
-	data := domain.PackageData{Packages: ps, MetadataStatus: "unknown", Simulation: "not_run"}
+	data := domain.PackageData{Packages: ps, MetadataStatus: "unknown", Simulation: "not_run", MetadataRefresh: c.aptRefresh()}
 	holds, he := c.run.Run(ctx, "apt-mark", "showhold")
 	held := map[string]bool{}
 	for _, v := range strings.Fields(string(holds)) {

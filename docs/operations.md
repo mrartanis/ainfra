@@ -50,3 +50,9 @@ infra-server backup --db /var/lib/infra/infra.db --output /private/backups/infra
 ## RouterOS
 
 Probe target задаётся только в локальном agent config: node_id, https url, credential_file, ca_file, token_file. Credential file 0600: JSON с username/password выделенного read-only пользователя. Режим `infra-agent probe --config ...` использует GET и ограниченные .proplist. HTTP, insecure TLS и redirects запрещены. Живая проверка устройства ещё не выполнена; см. acceptance.
+
+### Результат opt-in APT refresh
+
+`infra-apt-refresh.service` запускает отдельную команду `infra-agent refresh-apt`, без agent config или токена. Она выполняет только `apt-get update`, с `APT::Update::Error-Mode=any`, ожиданием APT lock и общим timeout 14 минут. Собственный flock исключает одновременные запуски; lock-файлы APT не удаляются.
+
+Результат атомарно записывается в `/var/lib/infra-apt-refresh/status.json` (0644, содержит только время и статус). `running` после аварийного завершения не считается успехом. Ошибка обновляет last_attempt/status, сохраняя last_success предыдущего успешного запуска. Обычный агент только читает результат, API/UI показывают его отдельно от неизвестного возраста всей совокупности APT metadata. Произвольный `mtime` не выдаётся за успешный refresh. Unit/timer по умолчанию не включены.

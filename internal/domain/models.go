@@ -145,13 +145,19 @@ type Package struct {
 	Held                   bool   `json:"held"`
 	BlockedReason          string `json:"blocked_reason"`
 }
+type APTRefresh struct {
+	LastAttempt time.Time `json:"last_attempt"`
+	LastSuccess time.Time `json:"last_success"`
+	Status      string    `json:"status"`
+}
 type PackageData struct {
-	PackageCount   int       `json:"package_count"`
-	UnknownOrigins int       `json:"unknown_origins"`
-	Updates        int       `json:"updates"`
-	Packages       []Package `json:"packages"`
-	MetadataStatus string    `json:"metadata_status"`
-	Simulation     string    `json:"simulation"`
+	MetadataRefresh *APTRefresh `json:"metadata_refresh,omitempty"`
+	PackageCount    int         `json:"package_count"`
+	UnknownOrigins  int         `json:"unknown_origins"`
+	Updates         int         `json:"updates"`
+	Packages        []Package   `json:"packages"`
+	MetadataStatus  string      `json:"metadata_status"`
+	Simulation      string      `json:"simulation"`
 }
 type OSData struct {
 	ID            string  `json:"id"`

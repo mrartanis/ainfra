@@ -1,5 +1,27 @@
 {
   "$defs": {
+    "APTRefresh": {
+      "additionalProperties": false,
+      "properties": {
+        "last_attempt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "last_success": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "last_attempt",
+        "last_success",
+        "status"
+      ],
+      "type": "object"
+    },
     "Ack": {
       "additionalProperties": false,
       "properties": {
@@ -852,6 +874,16 @@
     "PackageData": {
       "additionalProperties": false,
       "properties": {
+        "metadata_refresh": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/APTRefresh"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "metadata_status": {
           "type": "string"
         },
