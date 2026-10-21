@@ -277,3 +277,22 @@ func (s *Service) Context(ctx context.Context, p domain.Principal, id string) (s
 	}
 	return b.String(), nil
 }
+
+func (s *Service) Settings(ctx context.Context, p domain.Principal) (out map[string]json.RawMessage, err error) {
+	if !reader(p) {
+		return nil, ErrForbidden
+	}
+	out = map[string]json.RawMessage{}
+	err = s.store.Read(ctx, func(tx Tx) error {
+		var v json.RawMessage
+		if e := tx.Get("settings", "retention", &v); e != nil {
+			if e == ErrNotFound {
+				return nil
+			}
+			return e
+		}
+		out["retention"] = v
+		return nil
+	})
+	return
+}

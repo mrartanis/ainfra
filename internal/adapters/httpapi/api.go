@@ -119,6 +119,8 @@ func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return true
 	}
 	switch {
+	case path == "settings" && read:
+		out, e = a.s.Settings(ctx, p)
 	case path == "me" && read:
 		out = p
 	case path == "ingest/reports" && r.Method == "POST":

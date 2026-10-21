@@ -40,6 +40,10 @@ func run() error {
 	role := f.String("role", "admin", "bootstrap token role")
 	node := f.String("node", "", "target node ID")
 	instance := f.String("instance", "", "agent instance UUID")
+	retentionDays := f.Int("retention-days", 90, "receipt/event/resolved finding retention days")
+	maxHistory := f.Int("max-history", 100000, "maximum receipts and events each")
+	documentRevisions := f.Int("document-revisions", 20, "latest document revisions, plus approved")
+	maxDB := f.Int("max-db-mib", 1024, "maximum SQLite database size MiB")
 	enableFeeds := f.Bool("feeds", true, "sync official CVE feeds hourly")
 	name := f.String("name", "", "create node name")
 	if e := f.Parse(args); e != nil {
@@ -54,6 +58,10 @@ func run() error {
 		return e
 	}
 	defer store.Close()
+	policy := sqlite.Retention{Days: *retentionDays, MaxHistory: *maxHistory, DocumentRevisions: *documentRevisions, MaxDatabaseMiB: *maxDB}
+	if e = store.SetSizeLimit(context.Background(), *maxDB); e != nil {
+		return e
+	}
 	svc := app.New(store, time.Now, app.RandomID)
 	ctx := context.Background()
 	admin := domain.Principal{ID: "local-admin", Role: "admin"}
@@ -88,11 +96,34 @@ func run() error {
 			return fmt.Errorf("--output required")
 		}
 		return store.Backup(ctx, *output)
+	case "prune":
+		result, err := store.Prune(ctx, policy, time.Now())
+		if err != nil {
+			return err
+		}
+		return json.NewEncoder(os.Stdout).Encode(result)
 	case "sync-feeds":
 		return syncFeeds(ctx, svc)
 	case "serve":
 		ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 		defer stop()
+		if _, err := store.Prune(ctx, policy, time.Now()); err != nil {
+			return err
+		}
+		go func() {
+			ticker := time.NewTicker(time.Hour)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					if _, err := store.Prune(ctx, policy, time.Now()); err != nil {
+						log.Print("retention cleanup failed")
+					}
+				}
+			}
+		}()
 		if *enableFeeds {
 			go func() {
 				for {
