@@ -17,3 +17,7 @@ Seed: 83.27 s. `/proc/self/status`: VmHWM 126588 KiB (~124 MiB), конечны�
 Список и attention читают materialized summaries. Полные package snapshots остаются для отдельного detail/export/assessment. Индекс findings по node_id исключает пересканирование чужих узлов. Сводка учитывает срок suppression на чтении; истечение не требует heartbeat.
 
 Этот замер сделан после введения summaries, до финальной проверки pagination/search projection. После завершения API требуется повторить чтения на том же наборе. Одновременный большой feed import пока не измерен в этом прогоне.
+
+## Повтор после pagination/search projection
+
+Тот же набор данных, `--reuse`, 2 CPU / 2 GiB, 50 чтений после 5 прогревочных. Seed не повторялся. p50/p95 ms: nodes **3.160/3.632**, attention **2.898/3.209**, search **47.641/56.797**. Ответы соответственно 102127 / 41689 / 47802 B. Peak RSS процесса только чтений 22112 KiB (~22 MiB); это не peak ingestion/import. Search теперь возвращает count и bounded snippets, поэтому запрос делает дополнительный count и имеет другую форму ответа. Все p95 остаются меньше 100 ms. Raw report `.local/load-results-final.json`. Прогон последовательный, конкурентный большой feed import ещё не измерен.

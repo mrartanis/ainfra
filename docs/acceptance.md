@@ -20,7 +20,7 @@
 | Race/dependencies | race suite passed; govulncheck v1.9.0 no vulnerabilities на проверенном наборе | повтор security check после добавления schema validator запланирован |
 | Schemas | OpenAPI 3.1, generated wire models/report schema, schema validation tests | `api/`, `tools/schema-gen`, `internal/contracts`; transport constraints будут сверены с финальным API |
 | CI | pinned actions, test/race/release jobs, collector matrix | workflow committed; результат GitHub job нужно проверить отдельно |
-| Нагрузка | 100 nodes × 5000 packages / 10000 docs; 2 CPU / 2 GiB, p95 nodes 2.66 ms, attention 3.89 ms, search 24.12 ms | [benchmark](load-benchmark.md); повтор после финальной пагинации и concurrent feed import ещё не выполнен |
+| Нагрузка | 100 nodes × 5000 packages / 10000 docs; 2 CPU / 2 GiB, p95 nodes 2.66 ms, attention 3.89 ms, search 24.12 ms | [benchmark](load-benchmark.md); повтор после финальной пагинации: p95 nodes 3.63 / attention 3.21 / search 56.80 ms; concurrent feed import ещё не выполнен |
 | Live deployment | not run | владелец просил пока локальную приёмку; внешние адреса/credentials не предоставлены |
 
 Команды, реально прошедшие к текущему этапу: `make test`, `make lint`, `make fmt-check`, `make test-e2e`, `make test-race`, `make release`, `make release-check`, `python3 scripts/collector-matrix.py`, browser smoke из локального venv. Это фиксация этапов; после последующих изменений затронутые проверки выполняются повторно.

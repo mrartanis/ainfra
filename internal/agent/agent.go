@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -16,15 +17,16 @@ import (
 )
 
 type Config struct {
-	NodeID       string        `json:"node_id"`
-	Instance     string        `json:"agent_instance_id"`
-	Server       string        `json:"server_url"`
-	TokenFile    string        `json:"token_file"`
-	CAFile       string        `json:"ca_file"`
-	StateDir     string        `json:"state_dir"`
-	Collectors   []string      `json:"collectors"`
-	CheckFiles   []string      `json:"check_files"`
-	ProbeTargets []ProbeTarget `json:"probe_targets"`
+	CheckCommands []CheckCommand `json:"check_commands"`
+	NodeID        string         `json:"node_id"`
+	Instance      string         `json:"agent_instance_id"`
+	Server        string         `json:"server_url"`
+	TokenFile     string         `json:"token_file"`
+	CAFile        string         `json:"ca_file"`
+	StateDir      string         `json:"state_dir"`
+	Collectors    []string       `json:"collectors"`
+	CheckFiles    []string       `json:"check_files"`
+	ProbeTargets  []ProbeTarget  `json:"probe_targets"`
 }
 type ProbeTarget struct {
 	NodeID         string `json:"node_id"`
@@ -61,6 +63,20 @@ func LoadConfig(path string) (c Config, err error) {
 			return c, errors.New("unknown collector")
 		}
 	}
+
+	if len(c.CheckFiles)+len(c.CheckCommands) > 64 {
+		return c, errors.New("too many checks")
+	}
+	for _, path := range c.CheckFiles {
+		if !filepath.IsAbs(path) {
+			return c, errors.New("absolute check path required")
+		}
+	}
+	for _, command := range c.CheckCommands {
+		if !validCheckCommand(command) {
+			return c, errors.New("invalid check command")
+		}
+	}
 	return
 }
 
@@ -78,16 +94,21 @@ func (t APITransport) Send(ctx context.Context, r domain.Report) error {
 }
 
 type Agent struct {
-	config    Config
-	collector Collector
-	transport Transport
-	now       func() time.Time
-	id        func() string
-	wait      func(context.Context, time.Duration) error
+	checkRunner CheckRunner
+	config      Config
+	collector   Collector
+	transport   Transport
+	now         func() time.Time
+	id          func() string
+	wait        func(context.Context, time.Duration) error
 }
 
-func New(c Config, col Collector, t Transport, now func() time.Time, id func() string) *Agent {
-	return &Agent{c, col, t, now, id, retryWait}
+func New(c Config, col Collector, t Transport, now func() time.Time, id func() string, runners ...CheckRunner) *Agent {
+	var runner CheckRunner
+	if len(runners) > 0 {
+		runner = runners[0]
+	}
+	return &Agent{config: c, collector: col, transport: t, now: now, id: id, wait: retryWait, checkRunner: runner}
 }
 func AtomicWrite(path string, b []byte) error {
 	if e := os.MkdirAll(filepath.Dir(path), 0700); e != nil {
@@ -154,8 +175,8 @@ func (a *Agent) collect(ctx context.Context) (r domain.Report, err error) {
 		return r, e
 	}
 	r = domain.Report{SchemaVersion: 1, ID: a.id(), NodeID: a.config.NodeID, Instance: a.config.Instance, Sequence: seq, ObservedAt: a.now(), AgentVersion: "0.1.0", Collectors: a.collector.Collect(ctx, a.config.Collectors)}
-	if len(a.config.CheckFiles) > 0 {
-		r.Collectors["checks"] = a.checks()
+	if len(a.config.CheckFiles)+len(a.config.CheckCommands) > 0 {
+		r.Collectors["checks"] = a.checks(ctx)
 	}
 	return r, nil
 }
@@ -211,9 +232,10 @@ func (a *Agent) Run(ctx context.Context) error {
 	}
 	return e
 }
-func (a *Agent) checks() domain.Section {
+func (a *Agent) checks(ctx context.Context) domain.Section {
 	rows := []json.RawMessage{}
 	partial := false
+	inputs := [][]byte{}
 	for _, path := range a.config.CheckFiles {
 		f, e := os.Open(path)
 		if e != nil {
@@ -227,12 +249,31 @@ func (a *Agent) checks() domain.Section {
 			continue
 		}
 		b := make([]byte, st.Size())
-		_, e = f.Read(b)
+		_, e = io.ReadFull(f, b)
 		f.Close()
 		if e != nil {
 			partial = true
 			continue
 		}
+		inputs = append(inputs, b)
+	}
+	for _, command := range a.config.CheckCommands {
+		if a.checkRunner == nil || !validCheckCommand(command) {
+			partial = true
+			continue
+		}
+		checkCtx, cancel := context.WithTimeout(ctx, time.Duration(command.TimeoutSeconds)*time.Second)
+		b, err := a.checkRunner.Run(checkCtx, command.Argv, command.OutputLimit)
+		cancel()
+		if err != nil || len(b) > command.OutputLimit {
+			partial = true
+			continue
+		}
+		inputs = append(inputs, b)
+	}
+	seen := map[string]bool{}
+	total := 0
+	for _, b := range inputs {
 		var check struct {
 			SchemaVersion int             `json:"schema_version"`
 			ID            string          `json:"check_id"`
@@ -251,6 +292,12 @@ func (a *Agent) checks() domain.Section {
 			partial = true
 			continue
 		}
+		if seen[check.ID] || total+len(b) > 8<<20 {
+			partial = true
+			continue
+		}
+		seen[check.ID] = true
+		total += len(b)
 		rows = append(rows, b)
 	}
 	b, _ := json.Marshal(rows)

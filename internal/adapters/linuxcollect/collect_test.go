@@ -53,3 +53,10 @@ func FuzzDpkg(f *testing.F) {
 	f.Add("a\tamd64\t1\ta\t1\tinstalled\tinstall\n")
 	f.Fuzz(func(t *testing.T, s string) { linuxcollect.ParseDpkg(s) })
 }
+
+func TestCommandOutputLimitCannotBeBypassedByIOCopy(t *testing.T) {
+	_, err := (linuxcollect.ExecRunner{}).Run(context.Background(), "/usr/bin/printf", "%8388609s", "")
+	if err == nil {
+		t.Fatal("collector accepted output larger than 8 MiB")
+	}
+}

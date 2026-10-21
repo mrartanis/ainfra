@@ -20,15 +20,15 @@ type Runner interface {
 	Run(context.Context, string, ...string) ([]byte, error)
 }
 type bounded struct {
-	bytes.Buffer
-	limit int
+	buffer bytes.Buffer
+	limit  int
 }
 
 func (b *bounded) Write(p []byte) (int, error) {
-	if len(p) > b.limit-b.Len() {
+	if len(p) > b.limit-b.buffer.Len() {
 		return 0, errors.New("output_limit")
 	}
-	return b.Buffer.Write(p)
+	return b.buffer.Write(p)
 }
 
 type ExecRunner struct{ Timeout time.Duration }
@@ -50,7 +50,7 @@ func (r ExecRunner) Run(ctx context.Context, name string, args ...string) ([]byt
 	if e != nil {
 		return nil, errors.New("command_failed")
 	}
-	return out.Bytes(), nil
+	return out.buffer.Bytes(), nil
 }
 
 type Collector struct {

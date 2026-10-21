@@ -3,6 +3,7 @@ set -eu
 GO=${GO:-go}
 version=0.1.0
 mkdir -p dist
+"$GO" mod download
 for platform in linux/amd64 linux/arm64 darwin/arm64; do
     os=${platform%/*}
     arch=${platform#*/}
@@ -17,6 +18,7 @@ for platform in linux/amd64 linux/arm64 darwin/arm64; do
     cp -R packaging docs skills api "$staging/$name/"
     cp README.md go.mod go.sum "$staging/$name/"
     "$GO" list -m all > "$staging/$name/dependencies.txt"
+    GO="$GO" python3 scripts/dependency-notices.py "$staging/$name"
     tar -czf "dist/$name.tar.gz" -C "$staging" "$name"
     rm -rf "$staging"
 done

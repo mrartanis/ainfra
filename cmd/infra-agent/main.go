@@ -61,7 +61,7 @@ func run() error {
 	}
 	transport := agent.APITransport{Client: &apiclient.Client{Base: c.Server, Token: secret, HTTP: h}}
 	collector := linuxcollect.New(linuxcollect.ExecRunner{}, os.ReadFile, time.Now)
-	a := agent.New(c, collector, transport, time.Now, app.RandomID)
+	a := agent.New(c, collector, transport, time.Now, app.RandomID, agent.ExecCheckRunner{})
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	switch cmd {
@@ -96,6 +96,7 @@ func run() error {
 			cfg.NodeID = target.NodeID
 			cfg.StateDir = filepath.Join(c.StateDir, target.NodeID)
 			cfg.CheckFiles = nil
+			cfg.CheckCommands = nil
 			probe := routeros.New(client, target.URL, credentials.Username, credentials.Password, time.Now)
 			sender := agent.APITransport{Client: &apiclient.Client{Base: c.Server, Token: secret, HTTP: h}}
 			if e = agent.New(cfg, probe, sender, time.Now, app.RandomID).Run(ctx); e != nil {

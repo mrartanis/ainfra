@@ -56,3 +56,15 @@ Probe target задаётся только в локальном agent config: n
 `infra-apt-refresh.service` запускает отдельную команду `infra-agent refresh-apt`, без agent config или токена. Она выполняет только `apt-get update`, с `APT::Update::Error-Mode=any`, ожиданием APT lock и общим timeout 14 минут. Собственный flock исключает одновременные запуски; lock-файлы APT не удаляются.
 
 Результат атомарно записывается в `/var/lib/infra-apt-refresh/status.json` (0644, содержит только время и статус). `running` после аварийного завершения не считается успехом. Ошибка обновляет last_attempt/status, сохраняя last_success предыдущего успешного запуска. Обычный агент только читает результат, API/UI показывают его отдельно от неизвестного возраста всей совокупности APT metadata. Произвольный `mtime` не выдаётся за успешный refresh. Unit/timer по умолчанию не включены.
+
+### Локальные проверки командами
+
+Предпочтительны атомарно записываемые JSON `check_files`. Альтернатива в локальном agent.json:
+
+```json
+"check_commands": [
+  {"argv": ["/usr/local/libexec/infra-backup-status", "daily"], "timeout_seconds": 10, "output_limit": 65536}
+]
+```
+
+Каждая команда выдаёт один typed check JSON той же схемы, что check file. Абсолютный executable и все аргументы задаёт оператор; API и документы не могут добавлять команды. Это доверенный локальный скрипт, не sandbox. Не указывайте секреты в argv. Максимум 64 file/command checks, timeout 1–60 секунд, stdout до 1 MiB на команду, суммарный принятый JSON до 8 MiB. Stderr и ошибочный stdout не отправляются. Timeout убивает process group; успешные соседние checks остаются в partial report. Дубликат check_id даёт partial вместо повторного применения. Probe не запускает локальные checks для RouterOS.

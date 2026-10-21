@@ -43,7 +43,11 @@ func (s *Service) EditDocument(ctx context.Context, p domain.Principal, d domain
 		d.NeedsRevalidation = false
 		d.EvidenceHash = ""
 		if d.Kind == "maintenance_plan" {
-			d.EvidenceHash = evidence(tx, d.Nodes)
+			var e error
+			d.EvidenceHash, e = evidence(tx, d.Nodes)
+			if e != nil {
+				return e
+			}
 		}
 		if e := tx.Put("document", d.ID, d); e != nil {
 			return e
@@ -56,15 +60,19 @@ func (s *Service) EditDocument(ctx context.Context, p domain.Principal, d domain
 	})
 	return
 }
-func evidence(tx Tx, nodes []string) string {
+func evidence(tx Tx, nodes []string) (string, error) {
 	v := map[string]any{}
 	for _, id := range nodes {
 		var n domain.Node
-		if tx.Get("node", id, &n) == nil {
-			v[id] = n.Observations["packages"].Data
+		if e := tx.Get("node", id, &n); e != nil {
+			return "", e
 		}
+		v[id] = n.Observations["packages"].Data
 	}
-	docs, _ := decodeList[domain.Document](tx, "document")
+	docs, e := decodeList[domain.Document](tx, "document")
+	if e != nil {
+		return "", e
+	}
 	for _, d := range docs {
 		if d.Kind == "maintenance_plan" {
 			continue
@@ -75,7 +83,7 @@ func evidence(tx Tx, nodes []string) string {
 			}
 		}
 	}
-	return hash(v)
+	return hash(v), nil
 }
 func (s *Service) Document(ctx context.Context, p domain.Principal, id string, revision int) (d domain.Document, err error) {
 	if !reader(p) {
@@ -91,7 +99,13 @@ func (s *Service) Document(ctx context.Context, p domain.Principal, id string, r
 		if e := tx.Get(kind, key, &d); e != nil {
 			return e
 		}
-		d.NeedsRevalidation = d.Kind == "maintenance_plan" && d.EvidenceHash != evidence(tx, d.Nodes)
+		if d.Kind == "maintenance_plan" {
+			current, e := evidence(tx, d.Nodes)
+			if e != nil {
+				return e
+			}
+			d.NeedsRevalidation = d.EvidenceHash != current
+		}
 		return nil
 	})
 	return
@@ -107,7 +121,11 @@ func (s *Service) ApprovePlan(ctx context.Context, p domain.Principal, id string
 		if d.Kind != "maintenance_plan" || d.Author == p.ID {
 			return ErrForbidden
 		}
-		if d.Revision != rev || d.EvidenceHash != evidence(tx, d.Nodes) {
+		current, e := evidence(tx, d.Nodes)
+		if e != nil {
+			return e
+		}
+		if d.Revision != rev || d.EvidenceHash != current {
 			return ErrConflict
 		}
 		d.Status = "approved"
