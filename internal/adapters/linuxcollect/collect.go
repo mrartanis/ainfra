@@ -140,7 +140,9 @@ func (c *Collector) OS(ctx context.Context) domain.Section {
 	if b, e = c.read("/proc/uptime"); e == nil {
 		f := strings.Fields(string(b))
 		if len(f) > 0 {
-			d.UptimeSeconds, _ = strconv.ParseFloat(f[0], 64)
+			if value, err := strconv.ParseFloat(f[0], 64); err == nil && value >= 0 {
+				d.UptimeSeconds = &value
+			}
 		}
 	}
 	if _, e = c.read("/var/run/reboot-required"); e == nil {
@@ -378,9 +380,11 @@ func (c *Collector) Network(ctx context.Context) domain.Section {
 		return failed("interfaces_unavailable")
 	}
 	rows := []map[string]any{}
+	partial := false
 	for _, i := range interfaces {
 		addresses, e := i.Addrs()
 		if e != nil {
+			partial = true
 			continue
 		}
 		as := []string{}
@@ -389,13 +393,26 @@ func (c *Collector) Network(ctx context.Context) domain.Section {
 		}
 		rows = append(rows, map[string]any{"name": i.Name, "mtu": i.MTU, "flags": i.Flags.String(), "addresses": as})
 	}
-	data := map[string]any{"interfaces": rows, "routes_status": "unknown"}
-	b, e := c.run.Run(ctx, "ip", "-j", "route", "show", "table", "all")
-	if e == nil && json.Valid(b) {
-		data["routes"] = json.RawMessage(b)
-		data["routes_status"] = "ok"
+
+	data := map[string]any{"interfaces": rows}
+	for _, family := range []struct{ flag, key string }{{"-4", "routes"}, {"-6", "routes_ipv6"}} {
+		data[family.key+"_status"] = "unknown"
+		raw, err := c.run.Run(ctx, "ip", family.flag, "-j", "route", "show", "table", "all")
+		var routes []map[string]any
+		if err != nil || json.Unmarshal(raw, &routes) != nil || routes == nil {
+			partial = true
+			continue
+		}
+		data[family.key] = routes
+		data[family.key+"_status"] = "ok"
 	}
-	return c.section(data)
+	result := c.section(data)
+	if partial {
+		result.Status = "partial"
+		result.Complete = false
+		result.ErrorCode = "network_incomplete"
+	}
+	return result
 }
 func (c *Collector) Collect(ctx context.Context, collectors []string) map[string]domain.Section {
 	out := map[string]domain.Section{}

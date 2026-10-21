@@ -71,3 +71,30 @@ func TestAPTPolicyRetainsCandidateSourcesIndependently(t *testing.T) {
 		t.Fatal(p)
 	}
 }
+
+type routeRunner struct{ failIPv6 bool }
+
+func (r routeRunner) Run(_ context.Context, name string, args ...string) ([]byte, error) {
+	if name != "ip" {
+		return nil, errors.New("unexpected command")
+	}
+	if strings.Contains(strings.Join(args, " "), "-6") {
+		if r.failIPv6 {
+			return nil, errors.New("unavailable")
+		}
+		return []byte(`[{"dst":"default","gateway":"2001:db8::1"}]`), nil
+	}
+	return []byte(`[{"dst":"default","gateway":"192.0.2.1"}]`), nil
+}
+func TestNetworkCollectsBothRouteFamiliesAndExposesPartialFailure(t *testing.T) {
+	for _, failure := range []bool{false, true} {
+		c := linuxcollect.New(routeRunner{failure}, os.ReadFile, time.Now)
+		section := c.Network(context.Background())
+		if !failure && (!strings.Contains(string(section.Data), "2001:db8::1") || section.Status != "ok") {
+			t.Fatal(section)
+		}
+		if failure && (section.Status != "partial" || section.Complete || !strings.Contains(string(section.Data), "192.0.2.1")) {
+			t.Fatal("missing family hidden or good data lost", section)
+		}
+	}
+}

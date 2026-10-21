@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"sync"
 	"syscall"
 	"time"
@@ -105,7 +106,7 @@ func run() error {
 		}
 		return json.NewEncoder(os.Stdout).Encode(result)
 	case "sync-feeds":
-		return syncFeeds(ctx, svc)
+		return syncFeeds(ctx, svc, filepath.Join(filepath.Dir(*db), "feed-staging"))
 	case "serve":
 		ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 		defer stop()
@@ -141,7 +142,7 @@ func run() error {
 			go func() {
 				defer workers.Done()
 				for {
-					if err := syncFeeds(ctx, svc); err != nil {
+					if err := syncFeeds(ctx, svc, filepath.Join(filepath.Dir(*db), "feed-staging")); err != nil {
 						log.Print("feed sync failed; previous snapshot retained")
 					}
 					select {
@@ -160,7 +161,12 @@ func run() error {
 	}
 }
 
-func syncFeeds(ctx context.Context, svc *app.Service) error {
+func syncFeeds(ctx context.Context, svc *app.Service, stagingRoot string) error {
+	workspace, err := feeds.OpenWorkspace(stagingRoot)
+	if err != nil {
+		return err
+	}
+	defer workspace.Close()
 	h, e := apiclient.HTTP("")
 	if e != nil {
 		return e
@@ -178,7 +184,7 @@ func syncFeeds(ctx context.Context, svc *app.Service) error {
 				prev = f
 			}
 		}
-		stage, err := feeds.NewStage("")
+		stage, err := workspace.NewStage()
 		if err != nil {
 			return err
 		}

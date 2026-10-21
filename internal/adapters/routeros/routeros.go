@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -93,7 +94,45 @@ func (c *Collector) Collect(ctx context.Context, _ []string) map[string]domain.S
 	if e == nil && len(identity) == 1 {
 		os.Hostname = identity[0]["name"]
 	}
+	os.Model = r["board-name"]
+	partial := false
+	for _, field := range []struct {
+		key    string
+		target **uint64
+	}{{"free-memory", &os.MemoryFreeBytes}, {"total-hdd-space", &os.StorageBytes}, {"free-hdd-space", &os.StorageFreeBytes}} {
+		if raw, exists := r[field.key]; exists {
+			value, err := strconv.ParseUint(raw, 10, 64)
+			if err != nil {
+				partial = true
+			} else {
+				*field.target = &value
+			}
+		}
+	}
+	if raw, exists := r["cpu-load"]; exists {
+		value, err := strconv.ParseFloat(raw, 64)
+		if err != nil || value < 0 || value > 100 || math.IsNaN(value) {
+			partial = true
+		} else {
+			os.CPULoadPercent = &value
+		}
+	}
+	if raw, exists := r["uptime"]; exists {
+		value, err := parseUptime(raw)
+		if err != nil {
+			partial = true
+		} else {
+			os.UptimeSeconds = &value
+		}
+	}
 	out["os"] = c.section(os)
+	if partial {
+		section := out["os"]
+		section.Status = "partial"
+		section.Complete = false
+		section.ErrorCode = "resource_format"
+		out["os"] = section
+	}
 	endpoints := []struct{ section, path, fields string }{{"network", "interface", "name,type,mtu,running,disabled"}, {"network", "ip/address", "address,network,interface,disabled"}, {"network", "ip/route", "dst-address,gateway,distance,active"}, {"network", "ipv6/address", "address,interface,disabled"}, {"network", "ipv6/route", "dst-address,gateway,distance,active"}, {"wireguard", "interface/wireguard", "name,public-key,listen-port,mtu,disabled"}, {"wireguard", "interface/wireguard/peers", "interface,public-key,endpoint-address,endpoint-port,allowed-address,last-handshake,rx,tx,disabled"}}
 	data := map[string]map[string]any{"network": {}, "wireguard": {}}
 	bad := map[string]bool{}

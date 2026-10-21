@@ -163,16 +163,21 @@ type PackageData struct {
 	Simulation      string      `json:"simulation"`
 }
 type OSData struct {
-	ID            string  `json:"id"`
-	Codename      string  `json:"codename"`
-	Version       string  `json:"version"`
-	Hostname      string  `json:"hostname"`
-	Arch          string  `json:"arch"`
-	Kernel        string  `json:"kernel"`
-	CPU           int     `json:"cpu"`
-	MemoryBytes   uint64  `json:"memory_bytes"`
-	UptimeSeconds float64 `json:"uptime_seconds"`
-	Reboot        string  `json:"reboot"`
+	Model            string   `json:"model"`
+	MemoryFreeBytes  *uint64  `json:"memory_free_bytes"`
+	StorageBytes     *uint64  `json:"storage_bytes"`
+	StorageFreeBytes *uint64  `json:"storage_free_bytes"`
+	CPULoadPercent   *float64 `json:"cpu_load_percent"`
+	ID               string   `json:"id"`
+	Codename         string   `json:"codename"`
+	Version          string   `json:"version"`
+	Hostname         string   `json:"hostname"`
+	Arch             string   `json:"arch"`
+	Kernel           string   `json:"kernel"`
+	CPU              int      `json:"cpu"`
+	MemoryBytes      uint64   `json:"memory_bytes"`
+	UptimeSeconds    *float64 `json:"uptime_seconds"`
+	Reboot           string   `json:"reboot"`
 }
 type VersionEvent struct {
 	Introduced   string `json:"introduced,omitempty"`
