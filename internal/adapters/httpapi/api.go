@@ -71,6 +71,16 @@ func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("X-Request-ID", app.RandomID())
 	w.Header().Set("Content-Security-Policy", "default-src 'none'")
+	if r.URL.Path == "/readyz" && r.Method == "GET" {
+		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+		defer cancel()
+		if e := a.s.Ready(ctx); e != nil {
+			write(w, 503, map[string]string{"status": "unavailable"})
+		} else {
+			write(w, 200, map[string]string{"status": "ready"})
+		}
+		return
+	}
 	if r.URL.Path == "/healthz" && r.Method == "GET" {
 		write(w, 200, map[string]string{"status": "ok"})
 		return

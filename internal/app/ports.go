@@ -47,3 +47,7 @@ func decodeList[T any](tx Tx, kind string) ([]T, error) {
 	}
 	return out, nil
 }
+
+func (s *Service) Ready(ctx context.Context) error {
+	return s.store.Read(ctx, func(tx Tx) error { _, e := tx.List("settings"); return e })
+}

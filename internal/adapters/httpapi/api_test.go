@@ -6,6 +6,8 @@ import (
 	"ainfra/internal/domain"
 	"ainfra/internal/testkit"
 	"context"
+	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -42,4 +44,31 @@ func TestAPIWriteOnlyAndBodyLimits(t *testing.T) {
 	if strings.Contains(w.Body.String(), token) {
 		t.Fatal("secret leaked")
 	}
+}
+
+func TestReadinessChecksStorage(t *testing.T) {
+	s := app.New(brokenStore{}, time.Now, testkit.IDs())
+	h := httpapi.New(s)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, httptest.NewRequest("GET", "/readyz", nil))
+	if w.Code != 503 {
+		t.Fatalf("readiness %d", w.Code)
+	}
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, httptest.NewRequest("GET", "/healthz", nil))
+	if w.Code != 200 {
+		t.Fatalf("health %d", w.Code)
+	}
+}
+
+type brokenStore struct{}
+
+func (brokenStore) Read(context.Context, func(app.Tx) error) error {
+	return errors.New("database unavailable")
+}
+func (brokenStore) Write(context.Context, func(app.Tx) error) error {
+	return errors.New("database unavailable")
+}
+func (brokenStore) Search(context.Context, string, bool, int, int) ([]json.RawMessage, error) {
+	return nil, errors.New("database unavailable")
 }

@@ -2,7 +2,7 @@ GO ?= $(shell test ! -x .tools/go/bin/go || echo .tools/go/bin/go)
 ifeq ($(GO),)
 GO = go
 endif
-GOFMT = $(dir $(shell $(GO) env GOROOT))/go/bin/gofmt
+GOFMT = $(shell $(GO) env GOROOT)/bin/gofmt
 .PHONY: build test fmt fmt-check lint test-integration test-e2e test-security test-race release release-check
 build:
 	CGO_ENABLED=0 $(GO) build -trimpath -o bin/ ./cmd/...
@@ -11,7 +11,7 @@ test:
 fmt:
 	$(GO) fmt ./...
 fmt-check:
-	@test -z "$$(gofmt -l $$(find cmd internal -name '*.go'))"
+	@test -z "$$( $(GOFMT) -l $$(find cmd internal -name '*.go'))"
 lint:
 	$(GO) vet ./...
 test-integration:
