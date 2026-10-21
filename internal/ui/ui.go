@@ -411,6 +411,9 @@ func (u *UI) mutate(ctx context.Context, c *apiclient.Client, r *http.Request, d
 			return "", e
 		}
 		return "/docs/" + fmt.Sprint(out["id"]), nil
+	case "/docs/status":
+		id := f.Get("id")
+		return "/docs/" + id, c.Do(ctx, "POST", "documents/"+url.PathEscape(id)+"/status", map[string]string{"status": f.Get("status")}, nil, rev)
 	case "/docs/approve":
 		id := f.Get("id")
 		return "/docs/" + id, c.Do(ctx, "POST", "documents/"+url.PathEscape(id)+"/approve", nil, nil, rev)

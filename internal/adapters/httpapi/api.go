@@ -240,6 +240,14 @@ func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		v.ID = id
 		out, e = a.s.EditDocument(ctx, p, v, revision)
+	case parts[0] == "documents" && len(parts) == 3 && parts[2] == "status" && r.Method == "POST":
+		var v struct {
+			Status string `json:"status"`
+		}
+		if !body(&v) {
+			return
+		}
+		out, e = a.s.SetPlanStatus(ctx, p, id, revision, v.Status)
 	case parts[0] == "documents" && len(parts) == 3 && parts[2] == "approve" && r.Method == "POST":
 		out, e = a.s.ApprovePlan(ctx, p, id, revision)
 	case path == "relations" && read:

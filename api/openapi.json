@@ -338,6 +338,70 @@
         }
       }
     },
+    "/api/v1/documents/{id}/status": {
+      "post": {
+        "operationId": "post_documents_id_status",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Current revision, optionally quoted. Conflict returns 409.",
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./models.schema.json#/$defs/PlanStatusInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./models.schema.json#/$defs/Document"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Error; credentials and raw stderr are never included"
+          }
+        }
+      }
+    },
     "/api/v1/events": {
       "get": {
         "description": "Bounded page. X-Total-Count, X-Page-Limit, X-Page-Offset and optional X-Next-Offset headers describe pagination. Search caps limit at 100. Nodes list contains compact observations; fetch individual node for complete inventory.",

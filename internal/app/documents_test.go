@@ -79,3 +79,42 @@ func TestReenrollRevokesOldAgent(t *testing.T) {
 		t.Fatal(n)
 	}
 }
+
+func TestPlanTerminalStatusRequiresAdminAndApprovedRevision(t *testing.T) {
+	svc := app.New(testkit.NewStore(), time.Now, testkit.IDs())
+	ctx := context.Background()
+	editor := domain.Principal{Role: "editor", ID: "editor"}
+	admin := domain.Principal{Role: "admin", ID: "human"}
+	draft, err := svc.EditDocument(ctx, editor, domain.Document{Title: "Plan", Kind: "maintenance_plan", Body: "Manual maintenance"}, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = svc.SetPlanStatus(ctx, admin, draft.ID, 1, "completed"); !errors.Is(err, app.ErrConflict) {
+		t.Fatal("draft completed", err)
+	}
+	if _, err = svc.ApprovePlan(ctx, admin, draft.ID, 1); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = svc.SetPlanStatus(ctx, editor, draft.ID, 1, "completed"); !errors.Is(err, app.ErrForbidden) {
+		t.Fatal("editor completed", err)
+	}
+	if _, err = svc.SetPlanStatus(ctx, admin, draft.ID, 2, "completed"); !errors.Is(err, app.ErrConflict) {
+		t.Fatal("stale revision completed", err)
+	}
+	done, err := svc.SetPlanStatus(ctx, admin, draft.ID, 1, "completed")
+	if err != nil || done.Status != "completed" {
+		t.Fatal(done, err)
+	}
+	if _, err = svc.ApprovePlan(ctx, admin, draft.ID, 1); !errors.Is(err, app.ErrConflict) {
+		t.Fatal("completed plan reopened by approval", err)
+	}
+	draft.ID = ""
+	draft, err = svc.EditDocument(ctx, editor, draft, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cancelled, err := svc.SetPlanStatus(ctx, admin, draft.ID, 1, "cancelled")
+	if err != nil || cancelled.Status != "cancelled" {
+		t.Fatal(cancelled, err)
+	}
+}

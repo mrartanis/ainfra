@@ -125,7 +125,7 @@ func (s *Service) ApprovePlan(ctx context.Context, p domain.Principal, id string
 		if e != nil {
 			return e
 		}
-		if d.Revision != rev || d.EvidenceHash != current {
+		if d.Revision != rev || d.EvidenceHash != current || d.Status == "completed" || d.Status == "cancelled" {
 			return ErrConflict
 		}
 		d.Status = "approved"
@@ -171,4 +171,50 @@ func (s *Service) SearchCount(ctx context.Context, p domain.Principal, q string,
 		return 0, ErrInvalid
 	}
 	return s.store.CountSearch(ctx, q, literal)
+}
+
+// SetPlanStatus records a human decision; it never executes commands or resolves findings.
+func (s *Service) SetPlanStatus(ctx context.Context, p domain.Principal, id string, revision int, status string) (d domain.Document, err error) {
+	if p.Role != "admin" {
+		return d, ErrForbidden
+	}
+	if status != "completed" && status != "cancelled" {
+		return d, ErrInvalid
+	}
+	err = s.store.Write(ctx, func(tx Tx) error {
+		if e := tx.Get("document", id, &d); e != nil {
+			return e
+		}
+		if d.Kind != "maintenance_plan" {
+			return ErrInvalid
+		}
+		if d.Revision != revision {
+			return ErrConflict
+		}
+		if d.Status == status {
+			return nil
+		}
+		if d.Status == "completed" || d.Status == "cancelled" {
+			return ErrConflict
+		}
+		if status == "completed" {
+			if d.Status != "approved" || d.ApprovedRevision != revision {
+				return ErrConflict
+			}
+			current, e := evidence(tx, d.Nodes)
+			if e != nil {
+				return e
+			}
+			if current != d.EvidenceHash {
+				return ErrConflict
+			}
+		}
+		d.Status = status
+		d.UpdatedAt = s.now()
+		if e := tx.Put("document", id, d); e != nil {
+			return e
+		}
+		return s.event(tx, p, "plan."+status, id, fmt.Sprint(revision))
+	})
+	return
 }

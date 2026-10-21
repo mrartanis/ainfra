@@ -18,7 +18,7 @@ const Help = `infractl — клиент HTTP API Infra
   attention | packages list NODE [--upgradable] | findings list [--node ID]
   docs search QUERY [--literal] | docs get ID [--revision N]
   docs put --file document.json [--if-revision N]
-  docs approve ID --if-revision N
+  docs approve|complete|cancel ID --if-revision N
   relations list | relations put --file relation.json | relations delete ID
   tokens list | tokens issue --file principal.json --output token-file
   tokens revoke ID | feeds status | events | me
@@ -120,6 +120,14 @@ func Run(ctx context.Context, c *apiclient.Client, args []string, out io.Writer)
 					method = "PATCH"
 				}
 			}
+		case "complete", "cancel":
+			path = "documents/" + url.PathEscape(at(2)) + "/status"
+			method = "POST"
+			status := "completed"
+			if at(1) == "cancel" {
+				status = "cancelled"
+			}
+			input = map[string]any{"status": status}
 		case "approve":
 			path = "documents/" + url.PathEscape(at(2)) + "/approve"
 			method = "POST"

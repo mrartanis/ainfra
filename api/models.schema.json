@@ -1000,6 +1000,21 @@
       ],
       "type": "object"
     },
+    "PlanStatusInput": {
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "enum": [
+            "completed",
+            "cancelled"
+          ]
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "type": "object"
+    },
     "Principal": {
       "additionalProperties": false,
       "properties": {

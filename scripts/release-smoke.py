@@ -13,6 +13,8 @@ image = 'debian@sha256:62bd423aeee912639ca8ee681c2b762cb3e25137e0a92b20be455898a
 parser = argparse.ArgumentParser()
 parser.add_argument('--arch', choices=['amd64', 'arm64'], default='amd64')
 arch = parser.parse_args().arch
+if arch == "arm64":
+    image = "debian@sha256:a66b19aa552f595b4ab276c6b4f9b24fa4546632c5ecd88cccdced4a6866323a"
 archive = root / ('dist/infra-0.1.0-linux-' + arch + '.tar.gz')
 name = 'infra-release-' + uuid.uuid4().hex[:12]
 with tempfile.TemporaryDirectory(prefix='infra-release-') as directory:
@@ -60,6 +62,26 @@ with tempfile.TemporaryDirectory(prefix='infra-release-') as directory:
         assert observed['sequence'] == 1 and observed['observations']['packages']['data']['packages']
         write('doc.json', {'title': 'Archive restore evidence', 'kind': 'runbook', 'body': 'Unique archive smoke phrase', 'nodes': [node['id']]})
         doc = json.loads(cli('docs', 'put', '--file', '/config/doc.json').stdout)
+        # Walk through the shipped skill using actual binaries and role-scoped tokens.
+        for role in ['reader', 'editor']:
+            execute(server, 'bootstrap', '--db', db, '--role', role, '--output', '/tmp/state/' + role + '.token')
+            write(role + '.json', {'endpoint': 'http://127.0.0.1:18080', 'token_file': '/tmp/state/' + role + '.token'})
+        def scoped(role, *args, check=True):
+            return execute('/tmp/install/bin/infractl', '--config', '/config/' + role + '.json', *args, check=check)
+        assert json.loads(scoped('reader', 'me').stdout)['role'] == 'reader'
+        for args in [('attention',), ('feeds', 'status'), ('packages', 'list', node['id']), ('findings', 'list', '--node', node['id'])]:
+            json.loads(scoped('reader', *args).stdout)
+        context = scoped('reader', 'context', node['id'], '--format', 'markdown').stdout
+        assert 'UNTRUSTED DATA' in context and 'Unique archive smoke phrase' in context
+        write('plan.json', {'title': 'Skill walkthrough fixture', 'kind': 'maintenance_plan', 'nodes': [node['id']],
+                            'body': 'Disposable acceptance fixture. Inspect current inventory and vendor evidence. Feeds are absent here: CVE coverage unknown. No updates authorized or executed. Verify a real backup and restore before proposing changes; rollback availability unknown.'})
+        assert scoped('reader', 'docs', 'put', '--file', '/config/plan.json', check=False).returncode != 0
+        plan = json.loads(scoped('editor', 'docs', 'put', '--file', '/config/plan.json').stdout)
+        assert plan['status'] == 'draft'
+        assert scoped('editor', 'docs', 'approve', plan['id'], '--if-revision', '1', check=False).returncode != 0
+        assert json.loads(cli('docs', 'approve', plan['id'], '--if-revision', '1').stdout)['status'] == 'approved'
+        assert scoped('editor', 'docs', 'complete', plan['id'], '--if-revision', '1', check=False).returncode != 0
+        assert json.loads(cli('docs', 'complete', plan['id'], '--if-revision', '1').stdout)['status'] == 'completed'
         execute(server, 'backup', '--db', db, '--output', '/tmp/state/backup.db')
         execute('sh', '-c', 'kill -TERM "$(cat /tmp/server.pid)"')
         for _ in range(100):
@@ -80,6 +102,6 @@ with tempfile.TemporaryDirectory(prefix='infra-release-') as directory:
         execute('rm', '-r', '/tmp/install')
         execute('test', '-s', db)  # Uninstall leaves state and backup intact.
         execute('test', '-s', '/tmp/state/backup.db')
-        print(arch + ' release smoke passed: clean non-root/offline install, real agent, restart, active backup/restore, auth, search, export, uninstall preserves data')
+        print(arch + ' release smoke passed: clean non-root/offline install, real agent, restart, active backup/restore, auth, role-scoped skill walkthrough, search, export, uninstall preserves data')
     finally:
         subprocess.run(['docker', 'rm', '-f', name], capture_output=True)
