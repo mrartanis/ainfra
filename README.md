@@ -4,7 +4,7 @@
 
 Четыре независимых бинарника:
 
-- `infra-server`: HTTP API, SQLite, vendor feeds. TLS всегда завершается внешним proxy.
+- `infra-server`: HTTP API, SQLite, vendor feeds.
 - `infra-agent`: однократный read-only сбор Debian/Ubuntu; `probe` для RouterOS 7 HTTPS REST.
 - `infractl`: CLI к API, документы, поиск, context и экспорт.
 - `infra-ui`: отдельный HTTP UI; работает только через API, без доступа к БД.
