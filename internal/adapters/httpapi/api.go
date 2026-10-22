@@ -38,9 +38,10 @@ func failure(w http.ResponseWriter, e error) {
 	status := 500
 	code := "internal_error"
 	switch {
-	case errors.Is(e, app.ErrUnavailable):
+	case errors.Is(e, app.ErrUnavailable), errors.Is(e, context.DeadlineExceeded), errors.Is(e, context.Canceled):
 		status = 503
 		code = "temporarily_unavailable"
+		w.Header().Set("Retry-After", "2")
 	case errors.Is(e, app.ErrForbidden):
 		status = 403
 		code = "forbidden"
@@ -117,7 +118,11 @@ func (a *API) serve(w http.ResponseWriter, r *http.Request) {
 	}
 	p, e := a.s.Authenticate(ctx, strings.TrimPrefix(auth, "Bearer "))
 	if e != nil {
-		write(w, 401, map[string]string{"error": "unauthorized"})
+		if errors.Is(e, app.ErrForbidden) {
+			write(w, 401, map[string]string{"error": "unauthorized"})
+		} else {
+			failure(w, e)
+		}
 		return
 	}
 	path := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/v1/"), "/")
@@ -178,7 +183,7 @@ func (a *API) serve(w http.ResponseWriter, r *http.Request) {
 			out, e = a.inbox.Status(ctx)
 		}
 	case path == "nodes" && read:
-		out, e = a.s.Nodes(ctx, p)
+		out, e = a.s.NodesView(ctx, p, r.URL.Query().Get("view"))
 	case path == "nodes" && r.Method == "POST":
 		var v domain.Node
 		if !body(&v) {
@@ -187,7 +192,7 @@ func (a *API) serve(w http.ResponseWriter, r *http.Request) {
 		out, e = a.s.SaveNode(ctx, p, v, 0)
 		status = 201
 	case parts[0] == "nodes" && len(parts) == 2 && read:
-		out, e = a.s.Node(ctx, p, id)
+		out, e = a.s.NodeView(ctx, p, id, r.URL.Query().Get("view"))
 	case parts[0] == "nodes" && len(parts) == 2 && r.Method == "PATCH":
 		var v domain.Node
 		if !body(&v) {
@@ -273,6 +278,15 @@ func (a *API) serve(w http.ResponseWriter, r *http.Request) {
 		}
 		v.ID = id
 		out, e = a.s.EditDocument(ctx, p, v, revision)
+	case parts[0] == "documents" && len(parts) == 3 && parts[2] == "entries" && read:
+		out, e = a.s.Journal(ctx, p, id)
+	case parts[0] == "documents" && len(parts) == 3 && parts[2] == "entries" && r.Method == "POST":
+		var v domain.JournalEntry
+		if !body(&v) {
+			return
+		}
+		out, e = a.s.AppendJournal(ctx, p, id, v)
+		status = 201
 	case parts[0] == "documents" && len(parts) == 3 && parts[2] == "status" && r.Method == "POST":
 		var v struct {
 			Status string `json:"status"`
@@ -323,6 +337,8 @@ func (a *API) serve(w http.ResponseWriter, r *http.Request) {
 	}
 	switch v := out.(type) {
 	case domain.Node:
+		w.Header().Set("ETag", strconv.Quote(strconv.Itoa(v.Revision)))
+	case domain.NodeBrief:
 		w.Header().Set("ETag", strconv.Quote(strconv.Itoa(v.Revision)))
 	case domain.Document:
 		w.Header().Set("ETag", strconv.Quote(strconv.Itoa(v.Revision)))

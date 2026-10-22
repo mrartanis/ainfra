@@ -22,6 +22,33 @@ type tx struct {
 }
 
 func NewStore() *Store { return &Store{data: map[recordKey]json.RawMessage{}} }
+
+func (t tx) ListDocumentEntries(document string) ([]json.RawMessage, error) {
+	rows, err := t.List("journal-entry")
+	if err != nil {
+		return nil, err
+	}
+	out := []json.RawMessage{}
+	for _, raw := range rows {
+		var e domain.JournalEntry
+		if err := json.Unmarshal(raw, &e); err != nil {
+			return nil, err
+		}
+		if e.DocumentID == document {
+			out = append(out, raw)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		var a, b domain.JournalEntry
+		json.Unmarshal(out[i], &a)
+		json.Unmarshal(out[j], &b)
+		if a.CreatedAt.Equal(b.CreatedAt) {
+			return a.ID < b.ID
+		}
+		return a.CreatedAt.Before(b.CreatedAt)
+	})
+	return out, nil
+}
 func IDs() func() string {
 	n := 0
 	return func() string { n++; return fmt.Sprintf("00000000-0000-4000-8000-%012d", n) }

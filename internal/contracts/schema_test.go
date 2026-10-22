@@ -70,7 +70,11 @@ func TestActualNodeAndDocumentResponsesMatchSchemas(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	for name, value := range map[string]any{"Node": node, "Document": doc} {
+	entry, e := svc.AppendJournal(context.Background(), admin, doc.ID, domain.JournalEntry{ID: "entry", Step: "Check", Status: "succeeded"})
+	if e != nil {
+		t.Fatal(e)
+	}
+	for name, value := range map[string]any{"Node": node, "NodeBrief": domain.BriefNode(node), "Document": doc, "JournalEntry": entry} {
 		schema, e := compiler.Compile("https://infra.invalid/models.schema.json#/$defs/" + name)
 		if e != nil {
 			t.Fatal(e)

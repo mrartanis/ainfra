@@ -57,3 +57,11 @@ make build release release-check
 [Эксплуатация](docs/operations.md), [безопасность](docs/security.md), [модель](docs/data-model.md), [контракт providers](docs/provider-contract.md), [ход работ](docs/progress.md).
 
 Подключение роутеров: [инвентарь Keenetic с pi](docs/keenetic-inventory.md), [skill добавления Keenetic](skills/infra-add-keenetic/SKILL.md). [Входные точки на карте и площадки](docs/site-gateway.md) описывают текущие отметки и проект отдельной модели Site.
+
+## CLI для внешнего администратора
+
+`infractl` можно собрать локально на macOS/Linux: `make build-cli`, бинарник `bin/infractl`. Если исходников нет — `git clone https://github.com/mrartanis/ainfra.git`. Настройка токена и endpoint: [подготовка CLI](skills/infra-review/references/setup.md).
+
+`nodes list` по умолчанию выдаёт краткий список, `nodes show ID` — summary без массивов пакетов и runtime. Для services/coverage списка используй `nodes list --view summary`; полный инвентарь запрашивается явно через `--full`. Прямой API использует `view=brief|summary|full` с теми же defaults.
+
+Журнал обслуживания дописывается отдельными записями: `docs append ID --file -`, чтение — `docs entries ID --page-info --json`. У записи обязательны стабильный уникальный `id`, `step`, `status` (`info|started|succeeded|failed`); остальные поля: `command`, `result`, `evidence`, `rollback`, `body`. Повтор с тем же ID и содержимым безопасен. Документ и его одобрение не меняются. Сведения о хостах хранятся в сервисе Infra, `.local` предназначен для локальной разработки сервиса.

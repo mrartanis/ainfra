@@ -233,7 +233,13 @@ func (s *Service) Attention(ctx context.Context, p domain.Principal) (out []doma
 		if pd.MetadataRefresh != nil && pd.MetadataRefresh.Status == "error" {
 			a.Reasons = append(a.Reasons, "APT: управляемое обновление метаданных завершилось ошибкой")
 		}
-		unknown, updates := pd.UnknownOrigins, pd.Updates
+		unknown, updates := 0, 0
+		if pd.UnknownOrigins != nil {
+			unknown = *pd.UnknownOrigins
+		}
+		if pd.Updates != nil {
+			updates = *pd.Updates
+		}
 		if unknown > 0 {
 			a.Reasons = append(a.Reasons, fmt.Sprintf("Пакеты: неизвестное происхождение у %d", unknown))
 		}
@@ -275,6 +281,7 @@ func (s *Service) Packages(ctx context.Context, p domain.Principal, id string, u
 	if err = json.Unmarshal(sec.Data, &data); err != nil {
 		return
 	}
+	data = domain.CountPackages(data)
 	if upgradable {
 		ps := []domain.Package{}
 		for _, pkg := range data.Packages {
@@ -369,7 +376,7 @@ func (s *Service) Context(ctx context.Context, p domain.Principal, id string) (s
 				break
 			}
 			count++
-			fmt.Fprintf(&b, "- %s (%s), revision %d, %s; full text via docs get\n", d.Title, d.ID, d.Revision, d.UpdatedAt.Format(time.RFC3339))
+			fmt.Fprintf(&b, "- %s (%s), revision %d, %s; full text via docs get; append-only journal via docs entries\n", d.Title, d.ID, d.Revision, d.UpdatedAt.Format(time.RFC3339))
 			excerpt := []rune(d.Body)
 			if len(excerpt) > 1000 {
 				excerpt = append(excerpt[:1000], []rune("\n[excerpt truncated]")...)

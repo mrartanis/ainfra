@@ -1,6 +1,6 @@
-# Инвентарь Keenetic с pi
+# Инвентарь Keenetic через probe
 
-Статус: реализовано и установлено на pi, 2026-10-22. Адаптер Keenetic собирает `os`, `network`, `wireguard` через HTTPS RCI. Это сбор инвентаря; удалённое управление не входит в runtime сборщика. Учётки на роутерах готовит оператор отдельным helper, а не агент.
+Адаптер реализован; конкретные установки и результаты обслуживания хранятся в Infra. Адаптер Keenetic собирает `os`, `network`, `wireguard` через HTTPS RCI. Это сбор инвентаря; удалённое управление не входит в runtime сборщика. Учётки на роутерах готовит оператор отдельным helper, а не агент.
 
 ## Размещение и доступ
 
@@ -23,25 +23,18 @@ Credentials внешнего LLM-администратора хранятся �
 
 Перед выбором readonly-учётки нужно проверить версию: [бюллетень Keenetic KEN-PSA-2026-WP01](https://keenetic.com/en/security?lang=en) описывает повышение прав из readonly до администратора в версиях до 5.0.4. Успешный опрос с admin не доказывает работоспособность будущей учётки с меньшими правами.
 
-## Проверка с pi
+## Проверка протокола
 
-2026-10-22 сначала проверен `https://artanis-bg.keenetic.pro` из пользовательской SSH-сессии `pi`. HTTPS с проверкой сертификата, без proxy из окружения и без следования redirects. Разовый admin-пароль и cookies на диск pi не записывались. Исходный `/tmp/delme.pwd` удалён после первого теста. При последующем подключении обоих роутеров созданы отдельные readonly-учётки; их секреты сохранены только на pi. Выданные повторно локальные `/tmp/1` и `/tmp/2` удалены после настройки и применения отчётов.
+Перед подключением проверь HTTPS, `/auth` и доступ через новую readonly-сессию. Сохраняй результат, адреса, UUID и проверенные публичные ключи только в Infra; секреты — в защищённой конфигурации сборщика. В репозиторий не добавляй отчёты с реальных устройств.
 
-Подтверждено:
+- `GET /auth` возвращает challenge и realm; `POST /auth` с challenge-response создаёт сессию. Cookies хранятся в памяти процесса.
+- `/rci/show/version` определяет модель, архитектуру и версию. Версия нужна для проверки исправления KEN-PSA-2026-WP01.
+- `/rci/show/system` содержит uptime, CPU load и память. Строковые числа нормализуются; KiB переводятся в байты. [Официальный пример единиц памяти](https://destek.keenetic.com.tr/extra-dsl/kn-2111/tr/22350-using-the-zram-swap-file.html).
+- `/rci/show/interface` возвращает объект; для идентификации используется `row.id`, поскольку ключи верхнего уровня могут быть числовыми.
+- `/rci/show/interface/wireguard?name=WireguardN` содержит публичные ключи, peers и handshake. Служебное значение `2147483647` нельзя принимать за достоверный возраст handshake.
+- IPv4 routes приходят массивом; IPv6 могут приходить массивом, `{}` либо `{"route6": [...]}`. Неизвестная таблица остаётся `unknown`.
 
-- `GET /auth` возвращает 401 с challenge и realm `Keenetic Viva`.
-- `POST /auth` с challenge-response возвращает 200 и устанавливает сессию в cookie jar, хранящемся только в памяти процесса.
-- `GET /rci/show/version`: Viva (KN-1910), `title=5.1.6`, `release=5.01.C.6.0-1`, архитектура `mips`.
-- `GET /rci/show/system`: hostname, CPU load, память и uptime присутствуют в ответе. Uptime передан строкой с числом секунд; CPU load — числом. Память `memtotal`/`memfree` передана в KiB, в observations пересчитывается в байты. [Официальный пример единиц памяти](https://destek.keenetic.com.tr/extra-dsl/kn-2111/tr/22350-using-the-zram-swap-file.html).
-- `GET /rci/show/interface`: объект с интерфейсами, включая физические порты, Wi-Fi, bridges и шесть WireGuard-интерфейсов. Для идентификации нужен `row.id`: ключи верхнего объекта не всегда совпадают с ID, у портов встречаются числовые ключи.
-- `GET /rci/show/interface?name=WireguardN` и `GET /rci/show/interface/wireguard?name=WireguardN` возвращают публичный ключ интерфейса, peers, состояние и возраст handshake. Отдельный endpoint WireGuard даёт более узкий ответ.
-- `GET /rci/show/interface/stat?name=WireguardN` возвращает счётчики и скорости интерфейса.
-
-На снимке пять WireGuard-интерфейсов имели `state=up`, один — `down`. Встречается `last-handshake=2147483647`: его нельзя без проверки трактовать как реальный возраст handshake. Значения `connected=yes/no`, `state=up/down` и числовые строки требуют явной нормализации. HTTP 200 также требует проверки структуры и статуса команды, а не только HTTP-кода.
-
-В loopback metrics wireproxy на pi peer имеет публичный ключ `7iwsOZvCf6LsaxEQyHxKwt88uBO8Qd+io6bcNFNpGS8=`. Он совпадает с ключом `Wireguard2` белградского Keenetic; список peers этого интерфейса содержит публичный ключ pi из каталога. Публичные ключи всех шести интерфейсов внесены в узел роутера для topology. Эта связь не назначает белградский роутер gateway площадки pi: площадки pi и belgrade различны.
-
-Оба заданных имени работают с pi через `/auth`, в том числе с созданными readonly-учётками. Режим самого KeenDNS (прямой/облачный) не считывался из конфигурации. Отдельный endpoint на прямом публичном IP, Digest и длительный live-тест истечения сессии не выполнялись; повтор авторизации проверен protocol tests. IPv4 routes приходят массивом; IPv6 — массивом, `{}` либо `{"route6": [...]}`. Неизвестная routing table остаётся `unknown`.
+HTTP 200 не заменяет проверку структуры и RCI status. Наблюдаемый peer не назначает gateway площадки; для связи нужны проверенные публичные ключи обеих сторон. Состояние интерфейсов, конкретные связи и доступность проверяются заново для каждого узла.
 
 ## Реализация
 
@@ -49,16 +42,16 @@ Credentials внешнего LLM-администратора хранятся �
 
 Поля отбираются типизированными структурами; сырой ответ не отправляется. Формат WG нормализован к публичному формату Linux-коллектора, поэтому текущий сервер строит topology без обновления server binary. Неизвестные значения остаются отсутствующими; ошибка/partial не заменяет last-good snapshot. Ошибка одного target не прерывает обход остальных.
 
-Проверены auth/cookies/re-auth, RCI errors при HTTP 200, лимиты, TLS/redirects, исключение секретов, unknown metrics, формы routes и независимость targets. CLI-тесты выполнены на самом ARMv7 pi. Автоматическое CVE-покрытие Keenetic не возникает из Debian/Ubuntu feeds.
+Проверены auth/cookies/re-auth, RCI errors при HTTP 200, лимиты, TLS/redirects, исключение секретов, unknown metrics, формы routes и независимость targets. CLI поддерживает сборку для ARMv7. Автоматическое CVE-покрытие Keenetic не возникает из Debian/Ubuntu feeds.
 
 ## Подключение следующего устройства
 
-1. Проверь `ssh pi`, sudo, endpoint с проверкой TLS, права API Infra и отсутствие узла-дубликата. Уточни login и путь к разовому admin-паролю; не читай пароль в вывод. Для readonly нужна версия с исправлением KEN-PSA-2026-WP01 (проверенный нижний предел 5.0.4).
+1. Проверь SSH-доступ к probe-host, sudo и endpoint с проверкой TLS, права API Infra и отсутствие узла-дубликата. Уточни login и путь к разовому admin-паролю; не читай пароль в вывод. Для readonly нужна версия с исправлением KEN-PSA-2026-WP01 (проверенный нижний предел 5.0.4).
 2. На pi должен существовать системный пользователь `infra-probe`. Каталоги `/etc/infra-probe` и `targets` — root:infra-probe 0750. Скопируй операторский helper [provision-user.py](../skills/infra-add-keenetic/scripts/provision-user.py) на pi. Запусти его, передав admin-пароль через SSH stdin:
 
    ```sh
-   scp skills/infra-add-keenetic/scripts/provision-user.py pi:/tmp/infra-provision-user.py
-   ssh pi 'sudo -n python3 /tmp/infra-provision-user.py --url https://router.example --credential-output /etc/infra-probe/targets/NAME.credentials.json --owner infra-probe' < /absolute/path/admin-password
+   scp skills/infra-add-keenetic/scripts/provision-user.py PROBE_HOST:/tmp/infra-provision-user.py
+   ssh PROBE_HOST 'sudo -n python3 /tmp/infra-provision-user.py --url https://router.example --credential-output /etc/infra-probe/targets/NAME.credentials.json --owner infra-probe' < /absolute/path/admin-password
    ```
 
    Новый пользователь имеет имя `infra_pi_<random>` и отдельный случайный пароль. Helper не меняет `admin`, устанавливает пароль до выдачи доступа, проверяет ровно теги `http`/`readonly` и чтение через новую сессию, затем сохраняет конфигурацию. Если есть несохранённые изменения или версия не подтверждена, он останавливается до мутаций. Ошибка оставляет секрет для диагностики/повторного запуска; не создавай новые учётки и не повторяй неуспешные входы циклом. Отдельная проверка без admin-пароля и без изменений: те же аргументы плюс `--verify-only`.
@@ -78,7 +71,7 @@ Credentials внешнего LLM-администратора хранятся �
    {"type":"keenetic","node_id":"NODE_UUID","url":"https://router.example","credential_file":"/etc/infra-probe/targets/NAME.credentials.json","token_file":"/etc/infra-probe/targets/NAME.token","ca_file":""}
    ```
 
-   Общий config остаётся root:infra-probe 0640, `state_dir=/var/lib/infra-probe`. API endpoint — `https://ainfra.tupo.best`. Top-level `token_file` может ссылаться на первый target; отправка использует отдельный token каждого target.
+   Общий config остаётся root:infra-probe 0640, `state_dir=/var/lib/infra-probe`. API endpoint задаётся конфигурацией, например `https://infra.example.org`. Top-level `token_file` может ссылаться на первый target; отправка использует отдельный token каждого target.
 6. Сборка: `make build-agent-armv7`. Устанавливай бинарник в `/usr/local/bin/infra-probe`, root:root 0755. Используются [service](../packaging/systemd/infra-probe.service) и [timer](../packaging/systemd/infra-probe.timer); Linux-agent pi не заменяется.
 
    ```sh
@@ -92,13 +85,8 @@ Credentials внешнего LLM-администратора хранятся �
 
 Опрос — **раз в час**, случайный сдвиг до 5 минут (по выбору владельца). Первоначальный вариант раз в 5 минут заменён. Частота настраивается локально на pi; успешно доставленный heartbeat не освежает неуспешную секцию.
 
-## Установленные устройства
+## Учёт установленного оборудования
 
-| Узел | UUID | Endpoint | Проверенный результат |
-|---|---|---|---|
-| Keenetic belgrade | aa43b5cd-1b42-4595-9e17-7d2e3f3b29bb | https://artanis-bg.keenetic.pro | Viva KN-1910, 5.1.6, 128 MiB, 36 интерфейсов, 15 IPv4 routes, 6 WG-интерфейсов |
-| Keenetic MSK | a14d77cc-c48a-468f-8ce0-ea9a614bea08 | https://artanis.netcraze.pro | Ultra KN-1810, 5.1.6, 256 MiB, 30 интерфейсов, 61 IPv4 routes, WG-интерфейсов нет |
+Узлы, UUID, endpoints, публичные ключи, результаты проверок и расписания сохраняются в Infra. Проверяй владельцев credentials/config, минимальные права роутерных учёток, timestamps всех секций, состояние inbox и таймер. Эти сведения не дублируются в Git.
 
-Сервис работает от `infra-probe` без capabilities. Секреты 0600 принадлежат этому пользователю; config 0640 принадлежит root. Обе учётки роутеров имеют только `http` и `readonly`. На момент приёмки все три секции обоих узлов применены с `ok/complete`, inbox пуст. Входные точки отмечены в карточках и на карте меткой `labels.entry_point="true"`; в площадке их может быть несколько. Отдельная сущность Site остаётся [предложением модели](site-gateway.md).
-
-Основа протокола: [официальный справочник RCI](https://storage.googleapis.com/docs.help.keenetic.com/cli/3.1/en/cli_manual_kn-1310_tr.pdf), [HTTP Proxy API и Digest](https://support.keenetic.com/skipper-dsl/kn-2112/en/55035-using-api-methods-through-the-http-proxy-service.html). Описанная выше проверка относится к живому KN-1910 5.1.6, а не ко всем вариантам из справочников.
+Основа протокола: [официальный справочник RCI](https://storage.googleapis.com/docs.help.keenetic.com/cli/3.1/en/cli_manual_kn-1310_tr.pdf), [HTTP Proxy API и Digest](https://support.keenetic.com/skipper-dsl/kn-2112/en/55035-using-api-methods-through-the-http-proxy-service.html). Поддержка конкретной модели и версии подтверждается отдельной проверкой, а не одним наличием метода в справочнике.

@@ -1,0 +1,26 @@
+# Подготовка infractl
+
+Используй установленный `infractl` или бинарник существующего checkout. Отсутствие готового бинарника не препятствует работе: тул собирается локально на macOS/Linux.
+
+Если исходников ещё нет:
+
+```sh
+git clone https://github.com/mrartanis/ainfra.git
+cd ainfra
+make build-cli
+bin/infractl --help
+```
+
+Нужен Go версии из `go.mod` (сейчас 1.27.3). Makefile использует `.tools/go/bin/go`, если он уже есть, иначе `go` из PATH. Можно явно указать `make GO=/absolute/path/to/go build-cli`. Не скачивай toolchain или репозиторий поверх существующей рабочей копии. Готовые архивы: https://github.com/mrartanis/ainfra/releases ; при отсутствии подходящего релиза собери из исходников.
+
+CLI ищет конфиг по порядку: `--config /absolute/path/cli.json`, `INFRA_CONFIG`, затем `$XDG_CONFIG_HOME/ainfra/config.json` (если XDG_CONFIG_HOME не задан — `~/.config/ainfra/config.json`). Используй существующий выданный конфиг; формат:
+
+```json
+{"endpoint":"https://infra.example.org","token_file":"/absolute/path/reader.token","ca_file":""}
+```
+
+Токен — отдельный файл с правами 0600. Не передавай его в argv и не сохраняй в git/документы Infra. Локальный HTTP поддерживается только для literal loopback, например через уже разрешённый SSH-туннель; endpoint и доступ выбираются по действующей конфигурации. Не извлекай admin token сервера, если уже доступен выданный reader/editor.
+
+Если endpoint — loopback SSH-туннеля, проверь, что туннель активен; при необходимости открой его по действующему описанию доступа в Infra. Секреты и локальную конфигурацию храни вне checkout, каталог 0700, файлы 0600. Если владелец разрешил отдельный admin-токен для внешнего администратора, выпусти его через SSH/API вместо копирования человеческого токена; сохрани ID для отзыва. Не выдавай повышенные права без разрешения владельца.
+
+После настройки: `bin/infractl me --json` либо с явным `--config`. Права определяет ответ сервера. Сведения о хостах и журналы сохраняй через CLI в Infra, не в `.local`.

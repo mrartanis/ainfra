@@ -14,10 +14,11 @@ import (
 )
 
 const Help = `infractl — клиент HTTP API Infra
-  nodes list | nodes show ID | nodes put --file node.json --if-revision N
+  nodes list [--brief|--view summary|--full] | nodes show ID [--brief|--full] | nodes put --file node.json --if-revision N
   attention | packages list NODE [--upgradable] | findings list [--node ID]
   docs search QUERY [--literal] | docs get ID [--revision N]
   docs put --file document.json [--if-revision N]
+  docs append ID --file entry.json | docs entries ID
   docs approve|complete|cancel ID --if-revision N
   relations list | relations suggest [--node ID] | relations put --file relation.json | relations delete ID
   tokens list | tokens issue --file principal.json --output token-file
@@ -25,7 +26,11 @@ const Help = `infractl — клиент HTTP API Infra
   context NODE [--format markdown] | export --output NEW_DIRECTORY
   request METHOD API_PATH [--file JSON] [--if-revision N]
   --limit N --offset N: страница списка; --page-info: данные с метаданными страницы.
+  --file -: читать JSON из stdin.
   --json: машинный JSON; --config: JSON с endpoint, token_file, ca_file.
+  Узлы: list по умолчанию brief, show — summary; полный инвентарь только --full.
+  Формат docs append: JSON {id, step, status, command?, result?, evidence?, rollback?, body?}.
+  status: info|started|succeeded|failed; id сохраняйте для безопасного повтора.
   Формат docs put: JSON {id?, title, kind, body, nodes?, tags?}; без id создаёт документ.
 `
 
@@ -37,7 +42,7 @@ func Run(ctx context.Context, c *apiclient.Client, args []string, out io.Writer)
 		if strings.HasPrefix(a, "--") {
 			k := strings.TrimPrefix(a, "--")
 			switch k {
-			case "json", "literal", "upgradable", "help", "page-info":
+			case "json", "literal", "upgradable", "help", "page-info", "full", "brief":
 				opts[k] = "true"
 			default:
 				if i+1 >= len(args) {
@@ -60,9 +65,18 @@ func Run(ctx context.Context, c *apiclient.Client, args []string, out io.Writer)
 	var input any
 	var e error
 	if file := opts["file"]; file != "" {
-		b, err := os.ReadFile(file)
+		var b []byte
+		var err error
+		if file == "-" {
+			b, err = io.ReadAll(io.LimitReader(os.Stdin, (16<<20)+1))
+		} else {
+			b, err = os.ReadFile(file)
+		}
 		if err != nil {
 			return err
+		}
+		if len(b) > 16<<20 {
+			return errors.New("input exceeds 16 MiB")
 		}
 		if e = json.Unmarshal(b, &input); e != nil {
 			return e
@@ -76,11 +90,33 @@ func Run(ctx context.Context, c *apiclient.Client, args []string, out io.Writer)
 	}
 	switch pos[0] {
 	case "nodes":
+		view := opts["view"]
+		if opts["full"] == "true" {
+			view = "full"
+		}
+		if opts["brief"] == "true" {
+			if opts["full"] == "true" {
+				return errors.New("--brief and --full are mutually exclusive")
+			}
+			view = "brief"
+		}
+		if view != "" && view != "brief" && view != "summary" && view != "full" {
+			return errors.New("--view must be brief, summary or full")
+		}
 		switch at(1) {
 		case "list":
 			path = "nodes"
+			if view == "" {
+				view = "brief"
+			}
 		case "show":
 			path = "nodes/" + url.PathEscape(at(2))
+			if at(2) == "" {
+				return errors.New("node ID required")
+			}
+			if view == "" {
+				view = "summary"
+			}
 		case "put":
 			path = "nodes"
 			method = "POST"
@@ -90,6 +126,9 @@ func Run(ctx context.Context, c *apiclient.Client, args []string, out io.Writer)
 					method = "PATCH"
 				}
 			}
+		}
+		if method == "GET" && path != "" {
+			path += "?view=" + view
 		}
 	case "attention", "events", "me":
 		path = pos[0]
@@ -107,6 +146,17 @@ func Run(ctx context.Context, c *apiclient.Client, args []string, out io.Writer)
 		}
 	case "docs":
 		switch at(1) {
+		case "entries":
+			if at(2) == "" {
+				return errors.New("document ID required")
+			}
+			path = "documents/" + url.PathEscape(at(2)) + "/entries"
+		case "append":
+			if at(2) == "" || opts["file"] == "" {
+				return errors.New("docs append requires document ID and --file entry.json")
+			}
+			path = "documents/" + url.PathEscape(at(2)) + "/entries"
+			method = "POST"
 		case "search":
 			path = "search?q=" + url.QueryEscape(at(2)) + "&literal=" + opts["literal"]
 		case "get":
@@ -157,6 +207,9 @@ func Run(ctx context.Context, c *apiclient.Client, args []string, out io.Writer)
 			path += "/" + url.PathEscape(at(2))
 		}
 	case "context":
+		if at(1) == "" {
+			return errors.New("node ID required")
+		}
 		var text string
 		e = c.Do(ctx, "GET", "nodes/"+url.PathEscape(at(1))+"/context", nil, &text, 0)
 		if e != nil {

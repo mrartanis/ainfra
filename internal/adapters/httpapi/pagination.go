@@ -56,7 +56,11 @@ func paginate(w http.ResponseWriter, p pagination, value any) any {
 	switch rows := value.(type) {
 	case []domain.Node:
 		return page(w, p, rows)
+	case []domain.NodeBrief:
+		return page(w, p, rows)
 	case []domain.Document:
+		return page(w, p, rows)
+	case []domain.JournalEntry:
 		return page(w, p, rows)
 	case []domain.RelationSuggestion:
 		return page(w, p, rows)
@@ -73,7 +77,6 @@ func paginate(w http.ResponseWriter, p pagination, value any) any {
 	case []domain.Event:
 		return page(w, p, rows)
 	case domain.PackageData:
-		rows.PackageCount = len(rows.Packages)
 		rows.Packages = page(w, p, rows.Packages)
 		return rows
 	default:

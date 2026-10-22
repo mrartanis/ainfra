@@ -8,15 +8,7 @@
 
 Это роль узла в площадке. Наблюдаемый default route, VPN peer или существующая связь `uses_gateway` сами по себе не назначают gateway площадки. Один и тот же узел может одновременно быть гипервизором, gateway и объектом сбора инвентаря.
 
-Начальное назначение со слов владельца:
-
-| Площадка | Gateway |
-|---|---|
-| IBG | node0.c.ibgene.org (`node0`) |
-| 1dedic / площадка bp2 | bp2 |
-| belgrade | Keenetic `artanis-bg.keenetic.pro` |
-| MSK-artanis-butovo / площадка pi | Keenetic `artanis.netcraze.pro`, a14d77cc-c48a-468f-8ce0-ea9a614bea08 |
-| MDVOR | pve02.hintlab.com (`pve02`) |
+Фактические назначения площадок и gateway, адреса и UUID узлов хранятся в Infra. Репозиторий описывает модель и процедуру, без копии эксплуатационного инвентаря.
 
 ## Отметки в текущем инвентаре
 
@@ -31,9 +23,9 @@
 ```json
 {
   "id": "SITE_UUID",
-  "name": "belgrade",
+  "name": "example-site",
   "provider": "",
-  "location": "Belgrade",
+  "location": "Example location",
   "entry_point_node_ids": ["KEENETIC_NODE_UUID", "ANOTHER_ENTRY_NODE_UUID"],
   "revision": 1
 }

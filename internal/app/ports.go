@@ -26,6 +26,7 @@ type Tx interface {
 	Delete(kind, id string) error
 	List(kind string) ([]json.RawMessage, error)
 	ListNode(kind, node string) ([]json.RawMessage, error)
+	ListDocumentEntries(document string) ([]json.RawMessage, error)
 }
 type Store interface {
 	Read(context.Context, func(Tx) error) error

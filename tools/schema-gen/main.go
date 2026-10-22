@@ -75,7 +75,7 @@ func write(path string, v any) {
 	}
 }
 func main() {
-	for _, v := range []any{domain.Report{}, domain.Ack{}, domain.InboxStatus{}, domain.Node{}, domain.Document{}, domain.Principal{}, domain.Token{}, domain.Relation{}, domain.RelationSuggestion{}, domain.PackageData{}, domain.Finding{}, domain.Feed{}, domain.Attention{}, domain.Event{}, domain.Topology{}} {
+	for _, v := range []any{domain.Report{}, domain.Ack{}, domain.InboxStatus{}, domain.Node{}, domain.NodeBrief{}, domain.Document{}, domain.JournalEntry{}, domain.Principal{}, domain.Token{}, domain.Relation{}, domain.RelationSuggestion{}, domain.PackageData{}, domain.Finding{}, domain.Feed{}, domain.Attention{}, domain.Event{}, domain.Topology{}} {
 		shape(reflect.TypeOf(v))
 	}
 	defs["PlanStatusInput"] = schema{"type": "object", "additionalProperties": false, "required": []string{"status"}, "properties": schema{"status": schema{"enum": []string{"completed", "cancelled"}}}}
@@ -112,6 +112,14 @@ func main() {
 	}
 	defs["PrincipalInput"] = schema{"type": "object", "required": []string{"role"}, "properties": schema{"role": schema{"enum": []string{"reader", "editor", "agent", "probe", "admin"}}, "nodes": schema{"type": []string{"array", "null"}, "items": schema{"type": "string"}}, "instance": schema{"type": "string"}}, "additionalProperties": false}
 	defs["RelationInput"] = schema{"type": "object", "required": []string{"source", "target", "type"}, "properties": defs["Relation"].(schema)["properties"], "additionalProperties": false}
+	defs["JournalEntryInput"] = schema{"type": "object", "additionalProperties": false, "required": []string{"id", "step", "status"}, "properties": schema{
+		"id":      schema{"type": "string", "minLength": 1, "maxLength": 100},
+		"step":    schema{"type": "string", "minLength": 1, "maxLength": 300},
+		"status":  schema{"enum": []string{"info", "started", "succeeded", "failed"}},
+		"command": schema{"type": "string"}, "result": schema{"type": "string"},
+		"evidence": schema{"type": []string{"array", "null"}, "maxItems": 100, "items": schema{"type": "string"}},
+		"rollback": schema{"type": "string"}, "body": schema{"type": "string"},
+	}}
 	payloadSchemas()
 	root := schema{"$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://infra.invalid/models.schema.json", "$defs": defs}
 	write("api/models.schema.json", root)
@@ -123,7 +131,7 @@ func main() {
 	}
 	routes := []route{
 		{"topology", "get", "", "Topology", false},
-		{"ingest/reports", "post", "Report", "Ack", false}, {"ingest/queue", "get", "", "InboxStatus", false}, {"nodes", "get", "", "Node", true}, {"nodes", "post", "NodeInput", "Node", false}, {"nodes/{id}", "get", "", "Node", false}, {"nodes/{id}", "patch", "NodeInput", "Node", false}, {"nodes/{id}/packages", "get", "", "PackageData", false}, {"nodes/{id}/findings", "get", "", "Finding", true}, {"nodes/{id}/context", "get", "", "markdown", false}, {"nodes/{id}/pay", "post", "", "Node", false}, {"nodes/{id}/reenroll", "post", "ReenrollInput", "OK", false}, {"attention", "get", "", "Attention", true}, {"search", "get", "", "object", true}, {"findings", "get", "", "Finding", true}, {"findings/{id}/suppress", "post", "SuppressionInput", "OK", false}, {"feed-status", "get", "", "Feed", true}, {"documents", "get", "", "Document", true}, {"documents", "post", "DocumentInput", "Document", false}, {"documents/{id}", "get", "", "Document", false}, {"documents/{id}", "patch", "DocumentInput", "Document", false}, {"documents/{id}/approve", "post", "", "Document", false}, {"documents/{id}/status", "post", "PlanStatusInput", "Document", false}, {"relation-suggestions", "get", "", "RelationSuggestion", true}, {"relations", "get", "", "Relation", true}, {"relations", "post", "RelationInput", "Relation", false}, {"relations/{id}", "delete", "", "OK", false}, {"events", "get", "", "Event", true}, {"tokens", "get", "", "Token", true}, {"tokens", "post", "PrincipalInput", "IssuedToken", false}, {"tokens/{id}", "delete", "", "OK", false}, {"me", "get", "", "Principal", false}, {"settings", "get", "", "Settings", false}}
+		{"ingest/reports", "post", "Report", "Ack", false}, {"ingest/queue", "get", "", "InboxStatus", false}, {"nodes", "get", "", "Node", true}, {"nodes", "post", "NodeInput", "Node", false}, {"nodes/{id}", "get", "", "Node", false}, {"nodes/{id}", "patch", "NodeInput", "Node", false}, {"nodes/{id}/packages", "get", "", "PackageData", false}, {"nodes/{id}/findings", "get", "", "Finding", true}, {"nodes/{id}/context", "get", "", "markdown", false}, {"nodes/{id}/pay", "post", "", "Node", false}, {"nodes/{id}/reenroll", "post", "ReenrollInput", "OK", false}, {"attention", "get", "", "Attention", true}, {"search", "get", "", "object", true}, {"findings", "get", "", "Finding", true}, {"findings/{id}/suppress", "post", "SuppressionInput", "OK", false}, {"feed-status", "get", "", "Feed", true}, {"documents", "get", "", "Document", true}, {"documents", "post", "DocumentInput", "Document", false}, {"documents/{id}", "get", "", "Document", false}, {"documents/{id}", "patch", "DocumentInput", "Document", false}, {"documents/{id}/entries", "get", "", "JournalEntry", true}, {"documents/{id}/entries", "post", "JournalEntryInput", "JournalEntry", false}, {"documents/{id}/approve", "post", "", "Document", false}, {"documents/{id}/status", "post", "PlanStatusInput", "Document", false}, {"relation-suggestions", "get", "", "RelationSuggestion", true}, {"relations", "get", "", "Relation", true}, {"relations", "post", "RelationInput", "Relation", false}, {"relations/{id}", "delete", "", "OK", false}, {"events", "get", "", "Event", true}, {"tokens", "get", "", "Token", true}, {"tokens", "post", "PrincipalInput", "IssuedToken", false}, {"tokens/{id}", "delete", "", "OK", false}, {"me", "get", "", "Principal", false}, {"settings", "get", "", "Settings", false}}
 	ref := func(name string) any {
 		if name == "object" {
 			return schema{"type": "object"}
@@ -147,7 +155,7 @@ func main() {
 			response = schema{"type": "array", "items": response}
 		}
 		status := "200"
-		if r.method == "post" && (r.path == "nodes" || r.path == "documents" || r.path == "tokens") {
+		if r.method == "post" && (r.path == "nodes" || r.path == "documents" || r.path == "tokens" || r.path == "documents/{id}/entries") {
 			status = "201"
 		}
 		operation := schema{"operationId": strings.NewReplacer("/", "_", "{", "", "}", "").Replace(r.method + "_" + r.path), "responses": schema{status: schema{"description": "Success", "content": schema{contentType: schema{"schema": response}}}, "default": schema{"description": "Error; credentials and raw stderr are never included", "content": schema{"application/json": schema{"schema": schema{"type": "object", "required": []string{"error"}, "properties": schema{"error": schema{"type": "string"}}}}}}}}
@@ -158,7 +166,7 @@ func main() {
 		params := []any{}
 		if r.array || strings.HasSuffix(r.path, "/packages") {
 			params = append(params, schema{"name": "limit", "in": "query", "schema": schema{"type": "integer", "minimum": 1, "maximum": 1000, "default": 100}}, schema{"name": "offset", "in": "query", "schema": schema{"type": "integer", "minimum": 0, "default": 0}})
-			operation["description"] = "Bounded page. X-Total-Count, X-Page-Limit, X-Page-Offset and optional X-Next-Offset headers describe pagination. Search caps limit at 100. Nodes list contains compact observations; fetch individual node for complete inventory."
+			operation["description"] = "Bounded page. X-Total-Count, X-Page-Limit, X-Page-Offset and optional X-Next-Offset headers describe pagination. Search caps limit at 100. Nodes default to brief lists and summary detail; request view=full explicitly for complete inventory."
 		}
 
 		query := func(name string, value schema) {
@@ -166,6 +174,18 @@ func main() {
 		}
 		if r.method == "get" {
 			switch r.path {
+			case "nodes", "nodes/{id}":
+				defaultView := "brief"
+				if r.path == "nodes/{id}" {
+					defaultView = "summary"
+				}
+				query("view", schema{"enum": []string{"brief", "summary", "full"}, "default": defaultView})
+				variants := []any{ref("NodeBrief"), ref("Node")}
+				response = schema{"oneOf": variants}
+				if r.array {
+					response = schema{"type": "array", "items": response}
+				}
+				operation["responses"].(schema)[status].(schema)["content"] = schema{contentType: schema{"schema": response}}
 			case "relation-suggestions", "relations", "documents", "events", "findings":
 				query("node", schema{"type": "string"})
 			case "documents/{id}":

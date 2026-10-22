@@ -120,7 +120,7 @@ func TestUpgradeV1MaterializesCompactNodeList(t *testing.T) {
 		t.Fatal(nodes, e)
 	}
 	var data domain.PackageData
-	if e = json.Unmarshal(nodes[0].Observations["packages"].Data, &data); e != nil || data.PackageCount != 1 || data.Updates != 1 || len(data.Packages) != 0 {
+	if e = json.Unmarshal(nodes[0].Observations["packages"].Data, &data); e != nil || data.PackageCount == nil || *data.PackageCount != 1 || data.Updates == nil || *data.Updates != 1 || len(data.Packages) != 0 {
 		t.Fatal(data, e)
 	}
 }

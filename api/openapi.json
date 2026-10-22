@@ -16,7 +16,7 @@
   "paths": {
     "/api/v1/attention": {
       "get": {
-        "description": "Bounded page. X-Total-Count, X-Page-Limit, X-Page-Offset and optional X-Next-Offset headers describe pagination. Search caps limit at 100. Nodes list contains compact observations; fetch individual node for complete inventory.",
+        "description": "Bounded page. X-Total-Count, X-Page-Limit, X-Page-Offset and optional X-Next-Offset headers describe pagination. Search caps limit at 100. Nodes default to brief lists and summary detail; request view=full explicitly for complete inventory.",
         "operationId": "get_attention",
         "parameters": [
           {
@@ -114,7 +114,7 @@
     },
     "/api/v1/documents": {
       "get": {
-        "description": "Bounded page. X-Total-Count, X-Page-Limit, X-Page-Offset and optional X-Next-Offset headers describe pagination. Search caps limit at 100. Nodes list contains compact observations; fetch individual node for complete inventory.",
+        "description": "Bounded page. X-Total-Count, X-Page-Limit, X-Page-Offset and optional X-Next-Offset headers describe pagination. Search caps limit at 100. Nodes default to brief lists and summary detail; request view=full explicitly for complete inventory.",
         "operationId": "get_documents",
         "parameters": [
           {
@@ -392,6 +392,127 @@
         }
       }
     },
+    "/api/v1/documents/{id}/entries": {
+      "get": {
+        "description": "Bounded page. X-Total-Count, X-Page-Limit, X-Page-Offset and optional X-Next-Offset headers describe pagination. Search caps limit at 100. Nodes default to brief lists and summary detail; request view=full explicitly for complete inventory.",
+        "operationId": "get_documents_id_entries",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 100,
+              "maximum": 1000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "./models.schema.json#/$defs/JournalEntry"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Error; credentials and raw stderr are never included"
+          }
+        }
+      },
+      "post": {
+        "operationId": "post_documents_id_entries",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./models.schema.json#/$defs/JournalEntryInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./models.schema.json#/$defs/JournalEntry"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Error; credentials and raw stderr are never included"
+          }
+        }
+      }
+    },
     "/api/v1/documents/{id}/status": {
       "post": {
         "operationId": "post_documents_id_status",
@@ -458,7 +579,7 @@
     },
     "/api/v1/events": {
       "get": {
-        "description": "Bounded page. X-Total-Count, X-Page-Limit, X-Page-Offset and optional X-Next-Offset headers describe pagination. Search caps limit at 100. Nodes list contains compact observations; fetch individual node for complete inventory.",
+        "description": "Bounded page. X-Total-Count, X-Page-Limit, X-Page-Offset and optional X-Next-Offset headers describe pagination. Search caps limit at 100. Nodes default to brief lists and summary detail; request view=full explicitly for complete inventory.",
         "operationId": "get_events",
         "parameters": [
           {
@@ -525,7 +646,7 @@
     },
     "/api/v1/feed-status": {
       "get": {
-        "description": "Bounded page. X-Total-Count, X-Page-Limit, X-Page-Offset and optional X-Next-Offset headers describe pagination. Search caps limit at 100. Nodes list contains compact observations; fetch individual node for complete inventory.",
+        "description": "Bounded page. X-Total-Count, X-Page-Limit, X-Page-Offset and optional X-Next-Offset headers describe pagination. Search caps limit at 100. Nodes default to brief lists and summary detail; request view=full explicitly for complete inventory.",
         "operationId": "get_feed-status",
         "parameters": [
           {
@@ -585,7 +706,7 @@
     },
     "/api/v1/findings": {
       "get": {
-        "description": "Bounded page. X-Total-Count, X-Page-Limit, X-Page-Offset and optional X-Next-Offset headers describe pagination. Search caps limit at 100. Nodes list contains compact observations; fetch individual node for complete inventory.",
+        "description": "Bounded page. X-Total-Count, X-Page-Limit, X-Page-Offset and optional X-Next-Offset headers describe pagination. Search caps limit at 100. Nodes default to brief lists and summary detail; request view=full explicitly for complete inventory.",
         "operationId": "get_findings",
         "parameters": [
           {
@@ -826,7 +947,7 @@
     },
     "/api/v1/nodes": {
       "get": {
-        "description": "Bounded page. X-Total-Count, X-Page-Limit, X-Page-Offset and optional X-Next-Offset headers describe pagination. Search caps limit at 100. Nodes list contains compact observations; fetch individual node for complete inventory.",
+        "description": "Bounded page. X-Total-Count, X-Page-Limit, X-Page-Offset and optional X-Next-Offset headers describe pagination. Search caps limit at 100. Nodes default to brief lists and summary detail; request view=full explicitly for complete inventory.",
         "operationId": "get_nodes",
         "parameters": [
           {
@@ -847,6 +968,18 @@
               "minimum": 0,
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "view",
+            "schema": {
+              "default": "brief",
+              "enum": [
+                "brief",
+                "summary",
+                "full"
+              ]
+            }
           }
         ],
         "responses": {
@@ -855,7 +988,14 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "./models.schema.json#/$defs/Node"
+                    "oneOf": [
+                      {
+                        "$ref": "./models.schema.json#/$defs/NodeBrief"
+                      },
+                      {
+                        "$ref": "./models.schema.json#/$defs/Node"
+                      }
+                    ]
                   },
                   "type": "array"
                 }
@@ -932,6 +1072,18 @@
         "operationId": "get_nodes_id",
         "parameters": [
           {
+            "in": "query",
+            "name": "view",
+            "schema": {
+              "default": "summary",
+              "enum": [
+                "brief",
+                "summary",
+                "full"
+              ]
+            }
+          },
+          {
             "in": "path",
             "name": "id",
             "required": true,
@@ -945,7 +1097,14 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "./models.schema.json#/$defs/Node"
+                  "oneOf": [
+                    {
+                      "$ref": "./models.schema.json#/$defs/NodeBrief"
+                    },
+                    {
+                      "$ref": "./models.schema.json#/$defs/Node"
+                    }
+                  ]
                 }
               }
             },
@@ -1081,7 +1240,7 @@
     },
     "/api/v1/nodes/{id}/findings": {
       "get": {
-        "description": "Bounded page. X-Total-Count, X-Page-Limit, X-Page-Offset and optional X-Next-Offset headers describe pagination. Search caps limit at 100. Nodes list contains compact observations; fetch individual node for complete inventory.",
+        "description": "Bounded page. X-Total-Count, X-Page-Limit, X-Page-Offset and optional X-Next-Offset headers describe pagination. Search caps limit at 100. Nodes default to brief lists and summary detail; request view=full explicitly for complete inventory.",
         "operationId": "get_nodes_id_findings",
         "parameters": [
           {
@@ -1149,7 +1308,7 @@
     },
     "/api/v1/nodes/{id}/packages": {
       "get": {
-        "description": "Bounded page. X-Total-Count, X-Page-Limit, X-Page-Offset and optional X-Next-Offset headers describe pagination. Search caps limit at 100. Nodes list contains compact observations; fetch individual node for complete inventory.",
+        "description": "Bounded page. X-Total-Count, X-Page-Limit, X-Page-Offset and optional X-Next-Offset headers describe pagination. Search caps limit at 100. Nodes default to brief lists and summary detail; request view=full explicitly for complete inventory.",
         "operationId": "get_nodes_id_packages",
         "parameters": [
           {
@@ -1340,7 +1499,7 @@
     },
     "/api/v1/relation-suggestions": {
       "get": {
-        "description": "Bounded page. X-Total-Count, X-Page-Limit, X-Page-Offset and optional X-Next-Offset headers describe pagination. Search caps limit at 100. Nodes list contains compact observations; fetch individual node for complete inventory.",
+        "description": "Bounded page. X-Total-Count, X-Page-Limit, X-Page-Offset and optional X-Next-Offset headers describe pagination. Search caps limit at 100. Nodes default to brief lists and summary detail; request view=full explicitly for complete inventory.",
         "operationId": "get_relation-suggestions",
         "parameters": [
           {
@@ -1407,7 +1566,7 @@
     },
     "/api/v1/relations": {
       "get": {
-        "description": "Bounded page. X-Total-Count, X-Page-Limit, X-Page-Offset and optional X-Next-Offset headers describe pagination. Search caps limit at 100. Nodes list contains compact observations; fetch individual node for complete inventory.",
+        "description": "Bounded page. X-Total-Count, X-Page-Limit, X-Page-Offset and optional X-Next-Offset headers describe pagination. Search caps limit at 100. Nodes default to brief lists and summary detail; request view=full explicitly for complete inventory.",
         "operationId": "get_relations",
         "parameters": [
           {
@@ -1562,7 +1721,7 @@
     },
     "/api/v1/search": {
       "get": {
-        "description": "Bounded page. X-Total-Count, X-Page-Limit, X-Page-Offset and optional X-Next-Offset headers describe pagination. Search caps limit at 100. Nodes list contains compact observations; fetch individual node for complete inventory.",
+        "description": "Bounded page. X-Total-Count, X-Page-Limit, X-Page-Offset and optional X-Next-Offset headers describe pagination. Search caps limit at 100. Nodes default to brief lists and summary detail; request view=full explicitly for complete inventory.",
         "operationId": "get_search",
         "parameters": [
           {
@@ -1672,7 +1831,7 @@
     },
     "/api/v1/tokens": {
       "get": {
-        "description": "Bounded page. X-Total-Count, X-Page-Limit, X-Page-Offset and optional X-Next-Offset headers describe pagination. Search caps limit at 100. Nodes list contains compact observations; fetch individual node for complete inventory.",
+        "description": "Bounded page. X-Total-Count, X-Page-Limit, X-Page-Offset and optional X-Next-Offset headers describe pagination. Search caps limit at 100. Nodes default to brief lists and summary detail; request view=full explicitly for complete inventory.",
         "operationId": "get_tokens",
         "parameters": [
           {

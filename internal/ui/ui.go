@@ -210,7 +210,7 @@ func (u *UI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				u.RawQuery = q.Encode()
 				return u.String()
 			}
-			labels := map[string]string{"Attention": "Узлы", "Nodes": "Узлы для связи", "Findings": "Замечания", "Packages": "Пакеты", "Documents": "Записи", "Events": "История", "Relations": "Связи", "Tokens": "Токены", "Results": "Результаты поиска"}
+			labels := map[string]string{"Attention": "Узлы", "Nodes": "Узлы для связи", "Findings": "Замечания", "Packages": "Пакеты", "Documents": "Записи", "Events": "История", "Relations": "Связи", "Tokens": "Токены", "Results": "Результаты поиска", "Entries": "Журнал выполнения"}
 			control := map[string]any{"Name": labels[key], "Total": info.Total}
 			if info.NextOffset >= 0 {
 				control["Next"] = link(info.NextOffset)
@@ -339,7 +339,7 @@ func (u *UI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		data["Node"] = map[string]any{}
 	case strings.HasPrefix(path, "/nodes/"):
 		id := strings.TrimPrefix(path, "/nodes/")
-		if e := get("nodes/"+url.PathEscape(id), "Node"); e != nil {
+		if e := get("nodes/"+url.PathEscape(id)+"?view=full", "Node"); e != nil {
 			fail(e)
 			return
 		}
@@ -389,6 +389,10 @@ func (u *UI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		data["Page"] = "document"
 		data["Title"] = "Запись"
+		if e := get("documents/"+url.PathEscape(strings.TrimPrefix(path, "/docs/"))+"/entries", "Entries"); e != nil {
+			fail(e)
+			return
+		}
 	case path == "/search":
 		data["Page"] = "search"
 		data["Title"] = "Поиск"

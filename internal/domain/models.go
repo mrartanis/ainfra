@@ -149,6 +149,22 @@ type Event struct {
 	At     time.Time `json:"at"`
 	Detail string    `json:"detail"`
 }
+
+// JournalEntry is append-only operational evidence attached to a document.
+// ID is supplied by the caller so a retried append cannot duplicate an entry.
+type JournalEntry struct {
+	ID         string    `json:"id"`
+	DocumentID string    `json:"document_id"`
+	Step       string    `json:"step"`
+	Status     string    `json:"status"`
+	Command    string    `json:"command,omitempty"`
+	Result     string    `json:"result,omitempty"`
+	Evidence   []string  `json:"evidence,omitempty"`
+	Rollback   string    `json:"rollback,omitempty"`
+	Body       string    `json:"body,omitempty"`
+	Author     string    `json:"author"`
+	CreatedAt  time.Time `json:"created_at"`
+}
 type Package struct {
 	CandidateOrigin         string `json:"candidate_origin"`
 	CandidateSuite          string `json:"candidate_suite"`
@@ -175,9 +191,9 @@ type APTRefresh struct {
 }
 type PackageData struct {
 	MetadataRefresh *APTRefresh `json:"metadata_refresh,omitempty"`
-	PackageCount    int         `json:"package_count"`
-	UnknownOrigins  int         `json:"unknown_origins"`
-	Updates         int         `json:"updates"`
+	PackageCount    *int        `json:"package_count"`
+	UnknownOrigins  *int        `json:"unknown_origins"`
+	Updates         *int        `json:"updates"`
 	Packages        []Package   `json:"packages"`
 	MetadataStatus  string      `json:"metadata_status"`
 	Simulation      string      `json:"simulation"`

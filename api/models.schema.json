@@ -790,6 +790,111 @@
       ],
       "type": "object"
     },
+    "JournalEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "author": {
+          "type": "string"
+        },
+        "body": {
+          "type": "string"
+        },
+        "command": {
+          "type": "string"
+        },
+        "created_at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "document_id": {
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "result": {
+          "type": "string"
+        },
+        "rollback": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "step": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "document_id",
+        "step",
+        "status",
+        "author",
+        "created_at"
+      ],
+      "type": "object"
+    },
+    "JournalEntryInput": {
+      "additionalProperties": false,
+      "properties": {
+        "body": {
+          "type": "string"
+        },
+        "command": {
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 100,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "id": {
+          "maxLength": 100,
+          "minLength": 1,
+          "type": "string"
+        },
+        "result": {
+          "type": "string"
+        },
+        "rollback": {
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "info",
+            "started",
+            "succeeded",
+            "failed"
+          ]
+        },
+        "step": {
+          "maxLength": 300,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "step",
+        "status"
+      ],
+      "type": "object"
+    },
     "Node": {
       "additionalProperties": false,
       "properties": {
@@ -966,6 +1071,61 @@
         "collector_status",
         "services",
         "backups"
+      ],
+      "type": "object"
+    },
+    "NodeBrief": {
+      "additionalProperties": false,
+      "properties": {
+        "addresses": {
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "hostname": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "last_report": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "lifecycle": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "purpose": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "integer"
+        },
+        "slug": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "slug",
+        "hostname",
+        "kind",
+        "lifecycle",
+        "purpose",
+        "addresses",
+        "revision",
+        "last_report"
       ],
       "type": "object"
     },
@@ -1443,7 +1603,14 @@
           "type": "string"
         },
         "package_count": {
-          "type": "integer"
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "packages": {
           "items": {
@@ -1458,10 +1625,24 @@
           "type": "string"
         },
         "unknown_origins": {
-          "type": "integer"
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "updates": {
-          "type": "integer"
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
@@ -1548,7 +1729,14 @@
           "type": "string"
         },
         "package_count": {
-          "type": "integer"
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "packages": {
           "items": {
@@ -1564,10 +1752,24 @@
           "type": "string"
         },
         "unknown_origins": {
-          "type": "integer"
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "updates": {
-          "type": "integer"
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "type": "object"

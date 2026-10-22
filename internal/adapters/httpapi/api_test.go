@@ -115,6 +115,17 @@ func (brokenStore) CountSearch(context.Context, string, bool) (int, error) {
 	return 0, errors.New("database unavailable")
 }
 
+func TestAuthenticationStorageFailureIsNotInvalidCredentials(t *testing.T) {
+	h := httpapi.New(app.New(brokenStore{}, time.Now, testkit.IDs()))
+	r := httptest.NewRequest("GET", "/api/v1/me", nil)
+	r.Header.Set("Authorization", "Bearer "+strings.Repeat("a", 64))
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	if w.Code != 500 || strings.Contains(w.Body.String(), "database unavailable") {
+		t.Fatal(w.Code, w.Body.String())
+	}
+}
+
 func TestRelationSuggestionsReadableAndPaginated(t *testing.T) {
 	s := app.New(testkit.NewStore(), time.Now, testkit.IDs())
 	token, _, err := s.IssueToken(context.Background(), domain.Principal{Role: "admin"}, domain.Principal{Role: "reader"})

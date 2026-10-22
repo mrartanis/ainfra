@@ -75,7 +75,10 @@ func (s *Service) Authenticate(ctx context.Context, secret string) (p domain.Pri
 	err = s.store.Read(ctx, func(tx Tx) error {
 		var t domain.Token
 		if e := tx.Get("token", digest(secret), &t); e != nil {
-			return ErrForbidden
+			if e == ErrNotFound {
+				return ErrForbidden
+			}
+			return e
 		}
 		if t.Revoked {
 			return ErrForbidden

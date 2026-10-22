@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 )
 
 func main() {
@@ -35,6 +36,17 @@ func run() error {
 		fmt.Println("infractl 0.1.0")
 		return nil
 	}
+	if config == "" {
+		base := os.Getenv("XDG_CONFIG_HOME")
+		if base == "" {
+			userHome, err := os.UserHomeDir()
+			if err != nil {
+				return err
+			}
+			base = filepath.Join(userHome, ".config")
+		}
+		config = filepath.Join(base, "ainfra", "config.json")
+	}
 	var c struct {
 		Endpoint  string `json:"endpoint"`
 		TokenFile string `json:"token_file"`
@@ -42,7 +54,7 @@ func run() error {
 	}
 	b, e := os.ReadFile(config)
 	if e != nil {
-		return fmt.Errorf("set --config or INFRA_CONFIG")
+		return fmt.Errorf("cannot read CLI config; set --config or INFRA_CONFIG, or create ~/.config/ainfra/config.json")
 	}
 	if e = json.Unmarshal(b, &c); e != nil {
 		return e

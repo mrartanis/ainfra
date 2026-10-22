@@ -17,17 +17,7 @@ func SummarizeNode(n Node) Node {
 	if packages, ok := n.Observations["packages"]; ok {
 		var data PackageData
 		if json.Unmarshal(packages.Data, &data) == nil {
-			data.PackageCount = len(data.Packages)
-			data.UnknownOrigins = 0
-			data.Updates = 0
-			for _, p := range data.Packages {
-				if p.Origin == "" || p.SourceVersion == "" {
-					data.UnknownOrigins++
-				}
-				if c, e := version.Compare(p.Candidate, p.Version); e == nil && c > 0 {
-					data.Updates++
-				}
-			}
+			data = CountPackages(data)
 			data.Packages = nil
 			packages.Data, _ = json.Marshal(data)
 			observations["packages"] = packages
@@ -43,6 +33,60 @@ func SummarizeNode(n Node) Node {
 	}
 	n.Observations = observations
 	return n
+}
+
+// CountPackages derives totals from the complete inventory, never from a page.
+// A nil package list denotes a summary or missing inventory: preserve its
+// computed counters (or null), rather than inventing zeroes.
+func CountPackages(data PackageData) PackageData {
+	if data.Packages == nil {
+		return data
+	}
+	count, unknown, updates := len(data.Packages), 0, 0
+	for _, p := range data.Packages {
+		if p.Origin == "" || p.SourceVersion == "" {
+			unknown++
+		}
+		if c, e := version.Compare(p.Candidate, p.Version); e == nil && c > 0 {
+			updates++
+		}
+	}
+	data.PackageCount, data.UnknownOrigins, data.Updates = &count, &unknown, &updates
+	return data
+}
+
+// NormalizeNodeCounters also repairs historical reports whose counters were
+// serialized as zero before the server computed them.
+func NormalizeNodeCounters(n Node) Node {
+	observations := make(map[string]Section, len(n.Observations))
+	for kind, section := range n.Observations {
+		if kind == "packages" {
+			var data PackageData
+			if json.Unmarshal(section.Data, &data) == nil {
+				section.Data, _ = json.Marshal(CountPackages(data))
+			}
+		}
+		observations[kind] = section
+	}
+	n.Observations = observations
+	return n
+}
+
+type NodeBrief struct {
+	ID         string    `json:"id"`
+	Name       string    `json:"name"`
+	Slug       string    `json:"slug"`
+	Hostname   string    `json:"hostname"`
+	Kind       string    `json:"kind"`
+	Lifecycle  string    `json:"lifecycle"`
+	Purpose    string    `json:"purpose"`
+	Addresses  []string  `json:"addresses"`
+	Revision   int       `json:"revision"`
+	LastReport time.Time `json:"last_report"`
+}
+
+func BriefNode(n Node) NodeBrief {
+	return NodeBrief{n.ID, n.Name, n.Slug, n.Hostname, n.Kind, n.Lifecycle, n.Purpose, n.Addresses, n.Revision, n.LastReport}
 }
 
 type FindingBucket struct {

@@ -48,7 +48,7 @@ func exportAPI(ctx context.Context, c *apiclient.Client, target string) error {
 			return errors.New("unsafe node identity")
 		}
 		var full json.RawMessage
-		if e := c.Do(ctx, "GET", "nodes/"+url.PathEscape(node.ID), nil, &full, 0); e != nil {
+		if e := c.Do(ctx, "GET", "nodes/"+url.PathEscape(node.ID)+"?view=full", nil, &full, 0); e != nil {
 			return e
 		}
 		return write("nodes/"+node.Slug+"/node.json", full)
@@ -70,7 +70,18 @@ func exportAPI(ctx context.Context, c *apiclient.Client, target string) error {
 		if e := write("documents/"+doc.ID+".md", []byte("# "+doc.Title+"\n\n"+doc.Body)); e != nil {
 			return e
 		}
-		return write("documents/"+doc.ID+".json", raw)
+		if e := write("documents/"+doc.ID+".json", raw); e != nil {
+			return e
+		}
+		entries := []json.RawMessage{}
+		if e := c.ForEach(ctx, "documents/"+url.PathEscape(doc.ID)+"/entries", func(raw json.RawMessage) error { entries = append(entries, raw); return nil }); e != nil {
+			return e
+		}
+		journal, e := json.Marshal(entries)
+		if e != nil {
+			return e
+		}
+		return write("documents/"+doc.ID+".entries.json", journal)
 	}); e != nil {
 		return e
 	}

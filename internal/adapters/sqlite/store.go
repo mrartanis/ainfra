@@ -9,7 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	_ "modernc.org/sqlite"
+	sqlitedriver "modernc.org/sqlite"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -22,6 +22,9 @@ var migration string
 
 //go:embed migrations/002.sql
 var migration2 string
+
+//go:embed migrations/003.sql
+var migration3 string
 
 type Store struct{ db, readDB *sql.DB }
 type transaction struct {
@@ -79,12 +82,40 @@ func Open(path string) (*Store, error) {
 }
 func (s *Store) Close() error { return errors.Join(s.readDB.Close(), s.db.Close()) }
 func (s *Store) Read(ctx context.Context, f func(app.Tx) error) error {
-	return runTransaction(ctx, s.readDB, f)
+	return storageError(runTransaction(ctx, s.readDB, f))
 }
 func (s *Store) Write(ctx context.Context, f func(app.Tx) error) error {
-	return runTransaction(ctx, s.db, f)
+	// The single writer may be publishing a large feed. Bound admission to the
+	// writer, not the transaction itself: previously BeginTx waited until the
+	// HTTP deadline and returned an opaque 500 after 30s. A rejected callback
+	// has never run, so there are no late writes after the caller sees 503.
+	wait, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	conn, err := s.db.Conn(wait)
+	if err != nil {
+		return storageError(err)
+	}
+	defer conn.Close()
+	return storageError(runTransaction(ctx, conn, f))
 }
-func runTransaction(ctx context.Context, db *sql.DB, f func(app.Tx) error) error {
+
+func storageError(err error) error {
+	if err == nil {
+		return nil
+	}
+	var sqliteErr *sqlitedriver.Error
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) ||
+		(errors.As(err, &sqliteErr) && (sqliteErr.Code()&255 == 5 || sqliteErr.Code()&255 == 6)) {
+		return errors.Join(app.ErrUnavailable, err)
+	}
+	return err
+}
+
+type beginner interface {
+	BeginTx(context.Context, *sql.TxOptions) (*sql.Tx, error)
+}
+
+func runTransaction(ctx context.Context, db beginner, f func(app.Tx) error) error {
 	tx, e := db.BeginTx(ctx, nil)
 	if e != nil {
 		return e
@@ -189,8 +220,8 @@ func migrate(db *sql.DB) error {
 	if e = conn.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version); e != nil {
 		return e
 	}
-	if version > 2 {
-		return fmt.Errorf("database schema %d is newer than supported schema 2", version)
+	if version > 3 {
+		return fmt.Errorf("database schema %d is newer than supported schema 3", version)
 	}
 	if version == 0 {
 		if _, e = conn.ExecContext(ctx, migration); e != nil {
@@ -243,8 +274,33 @@ func migrate(db *sql.DB) error {
 			return e
 		}
 	}
+	if version < 3 {
+		if _, e = conn.ExecContext(ctx, migration3); e != nil {
+			return e
+		}
+		if _, e = conn.ExecContext(ctx, "PRAGMA user_version=3"); e != nil {
+			return e
+		}
+	}
 	_, e = conn.ExecContext(ctx, "COMMIT")
 	return e
+}
+
+func (t transaction) ListDocumentEntries(document string) ([]json.RawMessage, error) {
+	rows, err := t.tx.QueryContext(t.ctx, `SELECT body FROM records WHERE kind='journal-entry' AND json_extract(body,'$.document_id')=? ORDER BY json_extract(body,'$.created_at'),id`, document)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []json.RawMessage{}
+	for rows.Next() {
+		var raw []byte
+		if err = rows.Scan(&raw); err != nil {
+			return nil, err
+		}
+		out = append(out, json.RawMessage(raw))
+	}
+	return out, rows.Err()
 }
 
 const listNodeQuery = "SELECT body FROM records INDEXED BY records_node WHERE kind=? AND json_extract(body,'$.node_id')=? ORDER BY id"

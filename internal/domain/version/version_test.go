@@ -7,6 +7,9 @@ import (
 )
 
 func TestDebianOrderingAgainstDpkg(t *testing.T) {
+	if _, err := exec.LookPath("dpkg"); err != nil {
+		t.Skip("dpkg is needed for the Debian reference comparison")
+	}
 	versions := []string{"0", "1", "1.0", "1.0~rc1", "1.0-1", "1.0-1+b1", "1.0-1+deb12u1", "1.0-1~bpo12+1", "1:0.1", "2:0", "1.01", "1.0001", "1.0+git2024", "1.0-0", "1.0~~", "1.0a", "1.0+"}
 	for _, a := range versions {
 		for _, b := range versions {

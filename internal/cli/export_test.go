@@ -26,9 +26,14 @@ func TestExportTraversesPagesAndFetchesFullNodes(t *testing.T) {
 			}
 			fmt.Fprintf(w, `[{"id":%q,"slug":%q}]`, id, id)
 		case "/api/v1/nodes/a", "/api/v1/nodes/b":
+			if r.URL.Query().Get("view") != "full" {
+				t.Error("export must request full inventory")
+			}
 			fmt.Fprint(w, `{"observations":{"packages":{"data":{"packages":[{"name":"full-inventory"}]}}}}`)
 		case "/api/v1/documents":
 			fmt.Fprint(w, `[{"id":"doc","title":"Instruction","body":"backup first"}]`)
+		case "/api/v1/documents/doc/entries":
+			fmt.Fprint(w, `[{"id":"entry","step":"Validate","status":"succeeded"}]`)
 		case "/api/v1/relations", "/api/v1/events":
 			fmt.Fprint(w, `[]`)
 		default:
@@ -51,5 +56,8 @@ func TestExportTraversesPagesAndFetchesFullNodes(t *testing.T) {
 	}
 	if _, e := os.Stat(filepath.Join(dest, "documents/doc.md")); e != nil {
 		t.Fatal(e)
+	}
+	if raw, e := os.ReadFile(filepath.Join(dest, "documents/doc.entries.json")); e != nil || !bytes.Contains(raw, []byte("Validate")) {
+		t.Fatal(string(raw), e)
 	}
 }
