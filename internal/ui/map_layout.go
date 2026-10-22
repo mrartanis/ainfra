@@ -8,6 +8,7 @@ import "sort"
 type mapGroup struct {
 	ID, Name         string
 	Y, Height, Count int
+	EntryPointCount  int
 	External         bool
 }
 
@@ -44,6 +45,9 @@ func layoutMap(nodes map[string]mapNode, edges []mapEdge) ([]mapGroup, []mapEdge
 		}
 	}
 	less := func(a, b string) bool {
+		if nodes[a].EntryPoint != nodes[b].EntryPoint {
+			return nodes[a].EntryPoint
+		}
 		if nodes[a].Name != nodes[b].Name {
 			return nodes[a].Name < nodes[b].Name
 		}

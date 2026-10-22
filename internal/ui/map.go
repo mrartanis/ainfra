@@ -12,6 +12,7 @@ type mapNode struct {
 	ID, Name, Address, Services, Kind, Group string
 	X, Y                                     int
 	Unmanaged, Provider                      bool
+	Router, EntryPoint                       bool
 }
 type mapEdge struct {
 	Source, Target, SourceName, TargetName, Type, Name, Path, Label string
@@ -22,6 +23,7 @@ type mapView struct {
 	Groups                                               []mapGroup
 	Edges                                                []mapEdge
 	Width, Height, PublicCount, NodeCount, ProviderCount int
+	RouterCount, EntryPointCount                         int
 	Filter                                               string
 }
 
@@ -71,7 +73,14 @@ func buildMap(topology domain.Topology, filter string) mapView {
 			label = "Внешние сервисы не описаны"
 		}
 		kind := map[string]string{"physical": "Хост", "vm": "Виртуальная машина", "container": "Контейнер", "router": "Маршрутизатор", "other": "Узел"}[n.Kind]
-		nodes[n.ID] = mapNode{ID: n.ID, Name: n.Name, Address: strings.Join(n.Addresses, ", "), Kind: kind, Services: label}
+		router, entry := n.Kind == "router", n.Labels["entry_point"] == "true"
+		if router {
+			out.RouterCount++
+		}
+		if entry {
+			out.EntryPointCount++
+		}
+		nodes[n.ID] = mapNode{ID: n.ID, Name: n.Name, Address: strings.Join(n.Addresses, ", "), Kind: kind, Services: label, Router: router, EntryPoint: entry}
 	}
 	out.NodeCount = len(nodes)
 	hosting := domain.NewHostingIndex(topology.Nodes, topology.Relations)
@@ -121,6 +130,13 @@ func buildMap(topology domain.Topology, filter string) mapView {
 		add(peer.NodeID, id, "tunnel_peer", "Интерфейс "+peer.Interface+" · "+peer.ObservedAt.Format("2006-01-02 15:04 UTC"), true)
 	}
 	out.Groups, edges = layoutMap(nodes, edges)
+	for i := range out.Groups {
+		for _, n := range nodes {
+			if n.Group == out.Groups[i].ID && n.EntryPoint {
+				out.Groups[i].EntryPointCount++
+			}
+		}
+	}
 	ids := []string{}
 	for id := range nodes {
 		ids = append(ids, id)

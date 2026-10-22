@@ -1,0 +1,20 @@
+[Unit]
+Description=Infra read-only router inventory
+After=network-online.target
+Wants=network-online.target
+[Service]
+Type=oneshot
+User=infra-probe
+Group=infra-probe
+StateDirectory=infra-probe
+StateDirectoryMode=0700
+UMask=0077
+ExecStart=/usr/local/bin/infra-probe probe --config /etc/infra-probe/agent.json
+TimeoutStartSec=330
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6

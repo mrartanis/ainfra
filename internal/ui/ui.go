@@ -461,6 +461,13 @@ func (u *UI) mutate(ctx context.Context, c *apiclient.Client, r *http.Request, d
 				}
 			}
 		}
+		if f.Get("entry_point_present") == "1" {
+			if f.Get("entry_point") == "true" {
+				labels["entry_point"] = "true"
+			} else {
+				delete(labels, "entry_point")
+			}
+		}
 		n["labels"] = labels
 		if _, ok := f["links"]; ok {
 			links := map[string]string{}

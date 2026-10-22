@@ -9,3 +9,5 @@
 .map-zoom{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 12px}.map-zoom[hidden]{display:none}.map-zoom output{min-width:48px;text-align:center;font-variant-numeric:tabular-nums}.map-zoom button:disabled{opacity:.4;cursor:default}.map-zoom small{margin:0;color:#6b7672}.map-page{max-width:none;width:100%}
 
 .map-zoom{position:sticky;top:0;z-index:2;background:#f5f6f5;padding:8px 0}
+
+.map-legend{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:12px;color:#52645b}.map-router-key,.map-entry-key{padding:3px 9px;border-radius:5px}.map-router-key{background:#edf5ff;color:#315e82;border:1px solid #6e96b5}.map-entry-key{background:#fff0d9;color:#80521b;border:1px solid #b77a31}.map-node.router .map-card{fill:#edf5ff;stroke:#6e96b5}.map-node.router .map-kind{fill:#315e82;font-weight:650}.map-node.entry-point .map-card{stroke:#b77a31;stroke-width:2.5}.map-node a:hover .map-card{stroke:#126a61;stroke-width:3}.map-node .map-entry-badge rect{fill:#fff0d9;stroke:none}.map-entry-badge text{fill:#80521b;font-size:11px;font-weight:700}.map-group .map-group-entry-points{font-size:11px;font-weight:400;fill:#80521b}

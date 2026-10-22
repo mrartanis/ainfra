@@ -33,6 +33,7 @@ type Config struct {
 	ProbeTargets          []ProbeTarget  `json:"probe_targets"`
 }
 type ProbeTarget struct {
+	Type           string `json:"type,omitempty"`
 	NodeID         string `json:"node_id"`
 	URL            string `json:"url"`
 	CredentialFile string `json:"credential_file"`
@@ -88,6 +89,22 @@ func LoadConfig(path string) (c Config, err error) {
 	for _, command := range c.CheckCommands {
 		if !validCheckCommand(command) {
 			return c, errors.New("invalid check command")
+		}
+	}
+	if len(c.ProbeTargets) > 64 {
+		return c, errors.New("too many probe targets")
+	}
+	seen := map[string]bool{}
+	for _, target := range c.ProbeTargets {
+		if target.Type != "" && target.Type != "routeros" && target.Type != "keenetic" {
+			return c, errors.New("unknown probe type")
+		}
+		if target.NodeID == "" || strings.ContainsAny(target.NodeID, "/\\") || target.NodeID == "." || target.NodeID == ".." || seen[target.NodeID] {
+			return c, errors.New("invalid or duplicate probe node")
+		}
+		seen[target.NodeID] = true
+		if apiclient.ValidateURL(target.URL, false) != nil || !filepath.IsAbs(target.CredentialFile) || !filepath.IsAbs(target.TokenFile) || (target.CAFile != "" && !filepath.IsAbs(target.CAFile)) {
+			return c, errors.New("invalid probe endpoint or paths")
 		}
 	}
 	return

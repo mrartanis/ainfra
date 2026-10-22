@@ -180,3 +180,50 @@ func TestUnknownWireGuardPeersDoNotInheritObservedHostProvider(t *testing.T) {
 		}
 	}
 }
+
+func TestMultipleEntryPointsAreIndependentOfRouterKindAndHosting(t *testing.T) {
+	topology := domain.Topology{Nodes: []domain.Node{
+		{ID: "host", Name: "Z access host", Kind: "physical", Labels: map[string]string{"provider": "Site", "entry_point": "true"}},
+		{ID: "router", Name: "Z access router", Kind: "router", Labels: map[string]string{"provider": "Site", "entry_point": "true"}},
+		{ID: "internal", Name: "A internal router", Kind: "router", Labels: map[string]string{"provider": "Site", "role": "gateway"}},
+		{ID: "guest", Name: "Guest", Kind: "vm"},
+		{ID: "retired", Lifecycle: "retired", Kind: "router", Labels: map[string]string{"provider": "Site", "entry_point": "true"}},
+	}, Relations: []domain.Relation{{Source: "guest", Target: "host", Type: "runs_on"}, {Source: "internal", Target: "router", Type: "uses_gateway"}}}
+	for _, filter := range []string{"all", "runs_on", "tunnel_peer"} {
+		view := buildMap(topology, filter)
+		if view.EntryPointCount != 2 || view.RouterCount != 2 || len(view.Groups) != 1 || view.Groups[0].EntryPointCount != 2 {
+			t.Fatal(filter, view)
+		}
+		var host, internal mapNode
+		for _, n := range view.Nodes {
+			switch n.ID {
+			case "host":
+				host = n
+				if n.Router || !n.EntryPoint {
+					t.Fatal(n)
+				}
+			case "router":
+				if !n.Router || !n.EntryPoint {
+					t.Fatal(n)
+				}
+			case "internal":
+				internal = n
+				if !n.Router || n.EntryPoint {
+					t.Fatal("inferred entry point from role or route", n)
+				}
+			case "guest":
+				if n.EntryPoint {
+					t.Fatal("inherited entry role", n)
+				}
+			}
+		}
+		if host.Y >= internal.Y {
+			t.Fatal("access hosts should precede ordinary hosts", view.Nodes)
+		}
+		w := httptest.NewRecorder()
+		New("http://unused", nil, false, time.Now).render(w, map[string]any{"Page": "map", "Map": view})
+		if strings.Count(w.Body.String(), `class="map-entry-badge"`) != 2 || !strings.Contains(w.Body.String(), "Входных точек: 2") {
+			t.Fatal(w.Body.String())
+		}
+	}
+}

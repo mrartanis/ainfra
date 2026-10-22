@@ -5,6 +5,8 @@ description: Анализировать инвентарь Infra через infr
 
 # Infra review
 
+Для подключения нового Keenetic/Netcraze используй [infra-add-keenetic](../infra-add-keenetic/SKILL.md); этот skill разбирает уже собранный инвентарь.
+
 Прочитай [команды CLI](references/cli.md), затем `infractl me --json`: права берутся из текущего токена. Предпочитай reader; editor нужен только для сохранения черновика.
 
 Получи `infractl attention --json` и `infractl feeds status --json`. Прежде выводов проверь время наблюдений, последний успешный feed и ошибки collectors. Недавний heartbeat не освежает пакетный снимок.

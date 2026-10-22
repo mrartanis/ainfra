@@ -6,6 +6,7 @@ dist/
 *.db-shm
 *.db-wal
 coverage.out
+__pycache__/
 
 # Local deployment inventory and operational reports
 /inventory/

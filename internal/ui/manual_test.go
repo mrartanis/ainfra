@@ -93,6 +93,47 @@ func TestNodeMetadataEditPreservesOtherLabels(t *testing.T) {
 	}
 }
 
+func TestEntryPointCanBeSetClearedAndPreservedByOlderForms(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		fields url.Values
+		want   bool
+	}{
+		{"set", url.Values{"entry_point_present": {"1"}, "entry_point": {"true"}}, true},
+		{"clear", url.Values{"entry_point_present": {"1"}}, false},
+		{"legacy", url.Values{}, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var saved map[string]any
+			api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method == "GET" {
+					w.Write([]byte(`{"id":"node","revision":3,"labels":{"provider":"Site","entry_point":"true","custom":"keep"}}`))
+					return
+				}
+				if r.Header.Get("If-Match") != "3" {
+					t.Error("missing revision")
+				}
+				json.NewDecoder(r.Body).Decode(&saved)
+				w.Write([]byte(`{"id":"node"}`))
+			}))
+			defer api.Close()
+			r := httptest.NewRequest("POST", "/nodes/save", nil)
+			r.Form = tc.fields
+			r.Form.Set("id", "node")
+			r.Form.Set("revision", "3")
+			r.Form.Set("name", "host")
+			u := New(api.URL, api.Client(), false, time.Now)
+			if _, err := u.mutate(r.Context(), &apiclient.Client{Base: api.URL, HTTP: api.Client()}, r, map[string]any{}); err != nil {
+				t.Fatal(err)
+			}
+			labels := saved["labels"].(map[string]any)
+			if (labels["entry_point"] == "true") != tc.want || labels["custom"] != "keep" || labels["provider"] != "Site" {
+				t.Fatal(labels)
+			}
+		})
+	}
+}
+
 func TestPaymentDateEditPreservesPaidHistoryAndTimezone(t *testing.T) {
 	var saved map[string]any
 	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

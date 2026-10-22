@@ -69,6 +69,12 @@ infra-server backup --db /var/lib/infra/infra.db --output /private/backups/infra
 
 Probe target задаётся только в локальном agent config: node_id, https url, credential_file, ca_file, token_file. Credential file 0600: JSON с username/password выделенного read-only пользователя. Режим `infra-agent probe --config ...` использует GET и ограниченные .proplist. HTTP, insecure TLS и redirects запрещены. Живая проверка устройства ещё не выполнена; см. acceptance.
 
+## Keenetic / Netcraze
+
+Target с `"type":"keenetic"` собирает `os`, `network`, `wireguard` через HTTPS RCI; пустой type сохраняет прежний RouterOS. На pi установлены отдельные `infra-probe.service/.timer`, пользователь `infra-probe`, config `/etc/infra-probe/agent.json`, state `/var/lib/infra-probe`. Опрос раз в час со случайным сдвигом до 5 минут. Linux-agent pi работает независимо.
+
+Используются только отдельные readonly-учётки роутеров, credentials и scoped token каждого target — файлы 0600 на pi. Admin-пароли не сохраняются в сборщике или сервере. Разовая подготовка учётки, проверенный формат `user.password.md5.hash`, регистрация UUID и приёмка описаны в [процедуре подключения](keenetic-inventory.md) и [skill](../skills/infra-add-keenetic/SKILL.md). Живой опрос Viva KN-1910 и Ultra KN-1810 на 5.1.6 проверен. Digest не реализован; для обоих установленных endpoints работает `/auth` с cookies.
+
 ### Результат opt-in APT refresh
 
 `infra-apt-refresh.service` запускает отдельную команду `infra-agent refresh-apt`, без agent config или токена. Она выполняет только `apt-get update`, с `APT::Update::Error-Mode=any`, ожиданием APT lock и общим timeout 14 минут. Собственный flock исключает одновременные запуски; lock-файлы APT не удаляются.
@@ -134,3 +140,7 @@ wireguard-go с UAPI-сокетом обслуживается обычным `w
 ### Масштабирование карты
 
 Кнопки+/−,100% и «Уместить по ширине» меняют масштабSVG в диапазоне10–300%, сохраняя центр текущего участка. При фокусе на карте работают+/−/0; Ctrl/Cmd-сочетания остаются за браузером. Карта занимает доступную ширину страницы и всю высоту диаграммы, без внутренних полос прокрутки. При открытии подгоняется по ширине окна и продолжает подгоняться при resize, пока пользователь не выберет ручной масштаб. Перемещение идёт обычной прокруткой страницы. Без JavaScript доступна карта100% с прокруткой страницы. Обработчик`/map.js` обслуживается с того же origin; script-src self включён только для/map и/map.js, безinline/eval. Поведение масштаба можно проверить командой`node scripts/map-zoom-test.js`; Node нужен только для этого теста, не серверу или браузеру.
+
+## Входные точки на карте
+
+В редакторе узла администратор может включить флажок «Входная точка площадки». Он сохраняет ручную метку `labels.entry_point="true"`; снять флажок — удалить метку. На площадке можно отметить несколько узлов любого типа. Маршрутизатор дополнительно определяется типом `router` и имеет собственное оформление. Отметка не меняет размещение и не назначается гостям автоматически. Подробности — [площадки и gateway](site-gateway.md).

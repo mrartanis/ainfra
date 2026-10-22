@@ -1,6 +1,7 @@
 package main
 
 import (
+	"ainfra/internal/adapters/keenetic"
 	"ainfra/internal/adapters/linuxcollect"
 	"ainfra/internal/adapters/routeros"
 	"ainfra/internal/agent"
@@ -9,8 +10,10 @@ import (
 	"ainfra/internal/domain"
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -92,41 +95,13 @@ func run() error {
 		if len(c.ProbeTargets) == 0 {
 			return fmt.Errorf("no probe targets")
 		}
+		var failures []error
 		for _, target := range c.ProbeTargets {
-			if e = apiclient.ValidateURL(target.URL, false); e != nil {
-				return e
-			}
-			raw, e := apiclient.ReadSecret(target.CredentialFile)
-			if e != nil {
-				return e
-			}
-			var credentials struct {
-				Username string `json:"username"`
-				Password string `json:"password"`
-			}
-			if e = json.Unmarshal([]byte(raw), &credentials); e != nil {
-				return fmt.Errorf("invalid credential file")
-			}
-			client, e := apiclient.HTTP(target.CAFile)
-			if e != nil {
-				return e
-			}
-			secret, e := apiclient.ReadSecret(target.TokenFile)
-			if e != nil {
-				return e
-			}
-			cfg := c
-			cfg.NodeID = target.NodeID
-			cfg.StateDir = filepath.Join(c.StateDir, target.NodeID)
-			cfg.CheckFiles = nil
-			cfg.CheckCommands = nil
-			probe := routeros.New(client, target.URL, credentials.Username, credentials.Password, time.Now)
-			sender := agent.APITransport{Client: &apiclient.Client{Base: c.Server, Token: secret, HTTP: h}}
-			if e = agent.New(cfg, probe, sender, time.Now, app.RandomID).Run(ctx); e != nil {
-				return e
+			if err := runProbe(ctx, c, target, h); err != nil {
+				failures = append(failures, fmt.Errorf("probe %s: %w", target.NodeID, err))
 			}
 		}
-		return nil
+		return errors.Join(failures...)
 	case "collect":
 		r, e := a.Collect(ctx)
 		if e != nil {
@@ -151,6 +126,49 @@ func run() error {
 	default:
 		return fmt.Errorf("unknown command")
 	}
+}
+
+func runProbe(ctx context.Context, c agent.Config, target agent.ProbeTarget, h *http.Client) error {
+	var e error
+	if e = apiclient.ValidateURL(target.URL, false); e != nil {
+		return e
+	}
+	raw, e := apiclient.ReadSecret(target.CredentialFile)
+	if e != nil {
+		return e
+	}
+	var credentials struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	if e = json.Unmarshal([]byte(raw), &credentials); e != nil {
+		return fmt.Errorf("invalid credential file")
+	}
+	client, e := apiclient.HTTP(target.CAFile)
+	if e != nil {
+		return e
+	}
+	secret, e := apiclient.ReadSecret(target.TokenFile)
+	if e != nil {
+		return e
+	}
+	cfg := c
+	cfg.NodeID = target.NodeID
+	cfg.StateDir = filepath.Join(c.StateDir, target.NodeID)
+	cfg.CheckFiles = nil
+	cfg.CheckCommands = nil
+	cfg.Collectors = []string{"os", "network", "wireguard"}
+	var probe agent.Collector
+	switch target.Type {
+	case "", "routeros":
+		probe = routeros.New(client, target.URL, credentials.Username, credentials.Password, time.Now)
+	case "keenetic":
+		probe = keenetic.New(client, target.URL, credentials.Username, credentials.Password, time.Now)
+	default:
+		return fmt.Errorf("unsupported probe type")
+	}
+	sender := agent.APITransport{Client: &apiclient.Client{Base: c.Server, Token: secret, HTTP: h}}
+	return agent.New(cfg, probe, sender, time.Now, app.RandomID).Run(ctx)
 }
 
 func refreshAPT(path string) error {

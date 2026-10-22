@@ -2,10 +2,12 @@
 
 Личный инвентарь для человека и внешнего LLM-администратора. Работа не требует LLM, SaaS или CDN. Go, SQLite FTS5, HTTP API.
 
+Infra собирает и выдаёт сведения об инфраструктуре; агенты не администрируют узлы и не получают удалённые команды. Внешний LLM-администратор запускается отдельно, а его SSH/API credentials для изменений хранятся на машине его запуска. Эти credentials не передаются в Infra. Доступы сборщика для чтения устройств и токены отправки observations — отдельные секреты, доступные только соответствующему сборщику; сервер инвентаря их не хранит. Подробности — в [границах безопасности](docs/security.md).
+
 Четыре независимых бинарника:
 
 - `infra-server`: HTTP API, SQLite, vendor feeds.
-- `infra-agent`: однократный read-only сбор Debian/Ubuntu; `probe` для RouterOS 7 HTTPS REST.
+- `infra-agent`: однократный read-only сбор Debian/Ubuntu; `probe` для RouterOS 7 HTTPS REST и Keenetic/Netcraze HTTPS RCI.
 - `infractl`: CLI к API, документы, поиск, context и экспорт.
 - `infra-ui`: отдельный HTTP UI; работает только через API, без доступа к БД.
 
@@ -53,3 +55,5 @@ make build release release-check
 [Локальная приёмка](docs/acceptance.md) содержит проверенные сценарии и ограничения: живой RouterOS, внешний deployment и привилегированные helper units не запускались. Готовые архивы создаются в `dist/`, установка и восстановление описаны в [эксплуатации](docs/operations.md).
 
 [Эксплуатация](docs/operations.md), [безопасность](docs/security.md), [модель](docs/data-model.md), [контракт providers](docs/provider-contract.md), [ход работ](docs/progress.md).
+
+Подключение роутеров: [инвентарь Keenetic с pi](docs/keenetic-inventory.md), [skill добавления Keenetic](skills/infra-add-keenetic/SKILL.md). [Входные точки на карте и площадки](docs/site-gateway.md) описывают текущие отметки и проект отдельной модели Site.
