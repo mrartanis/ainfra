@@ -9,19 +9,20 @@ import (
 )
 
 type mapNode struct {
-	ID, Name, Address, Services, Kind string
-	X, Y                              int
-	Unmanaged                         bool
+	ID, Name, Address, Services, Kind, Group string
+	X, Y                                     int
+	Unmanaged, Provider                      bool
 }
 type mapEdge struct {
 	Source, Target, SourceName, TargetName, Type, Name, Path, Label string
-	Observed                                                        bool
+	Observed, Placement                                             bool
 }
 type mapView struct {
-	Nodes                      []mapNode
-	Edges                      []mapEdge
-	Width, Height, PublicCount int
-	Filter                     string
+	Nodes                                                []mapNode
+	Groups                                               []mapGroup
+	Edges                                                []mapEdge
+	Width, Height, PublicCount, NodeCount, ProviderCount int
+	Filter                                               string
 }
 
 func packageState(p map[string]any) string {
@@ -72,6 +73,16 @@ func buildMap(topology domain.Topology, filter string) mapView {
 		kind := map[string]string{"physical": "Хост", "vm": "Виртуальная машина", "container": "Контейнер", "router": "Маршрутизатор", "other": "Узел"}[n.Kind]
 		nodes[n.ID] = mapNode{ID: n.ID, Name: n.Name, Address: strings.Join(n.Addresses, ", "), Kind: kind, Services: label}
 	}
+	out.NodeCount = len(nodes)
+	hosting := domain.NewHostingIndex(topology.Nodes, topology.Relations)
+	for id := range hosting.Nodes {
+		if len(hosting.Parents[id]) != 0 {
+			continue
+		}
+		provider := hosting.Providers(id)[0]
+		pid := "provider:" + provider
+		nodes[pid] = mapNode{ID: pid, Name: provider, Kind: "Хостер / площадка", Services: "Размещение хостов", Provider: true}
+	}
 	edges := []mapEdge{}
 	add := func(source, target, kind, name string, observed bool) {
 		a, okA := nodes[source]
@@ -83,6 +94,12 @@ func buildMap(topology domain.Topology, filter string) mapView {
 	}
 	for _, r := range topology.Relations {
 		add(r.Source, r.Target, r.Type, r.Name, false)
+	}
+	for id := range hosting.Nodes {
+		if len(hosting.Parents[id]) == 0 {
+			add(id, "provider:"+hosting.Providers(id)[0], "hosted_by", "По размещению хоста", false)
+			edges[len(edges)-1].Placement = true
+		}
 	}
 	for _, r := range topology.Suggestions {
 		if r.Type != "tunnel_peer" {
@@ -103,91 +120,68 @@ func buildMap(topology domain.Topology, filter string) mapView {
 		nodes[id] = mapNode{ID: id, Name: "WireGuard peer", Address: shortMapText(peer.PublicKey, 32), Kind: "Вне инвентаря", Services: "Узел не привязан к public key", Unmanaged: true}
 		add(peer.NodeID, id, "tunnel_peer", "Интерфейс "+peer.Interface+" · "+peer.ObservedAt.Format("2006-01-02 15:04 UTC"), true)
 	}
-	// Longest path through the hosting DAG preserves arbitrary nesting and
-	// multiple parents. A malformed legacy cycle cannot trap the layout.
-	depth, indegree := map[string]int{}, map[string]int{}
-	children := map[string][]string{}
-	for id := range nodes {
-		indegree[id] = 0
-	}
-	for _, e := range edges {
-		if e.Type == "runs_on" {
-			children[e.Target] = append(children[e.Target], e.Source)
-			indegree[e.Source]++
-		}
-	}
-	queue := []string{}
-	for id, n := range indegree {
-		if n == 0 {
-			queue = append(queue, id)
-		}
-	}
-	sort.Strings(queue)
-	for len(queue) > 0 {
-		id := queue[0]
-		queue = queue[1:]
-		for _, child := range children[id] {
-			if depth[child] < depth[id]+1 {
-				depth[child] = depth[id] + 1
-			}
-			indegree[child]--
-			if indegree[child] == 0 {
-				queue = append(queue, child)
-			}
-		}
-	}
-	for _, e := range edges {
-		if nodes[e.Target].Unmanaged && depth[e.Target] < depth[e.Source]+1 {
-			depth[e.Target] = depth[e.Source] + 1
-		}
-	}
+	out.Groups, edges = layoutMap(nodes, edges)
 	ids := []string{}
 	for id := range nodes {
 		ids = append(ids, id)
 	}
 	sort.Slice(ids, func(i, j int) bool {
-		if depth[ids[i]] != depth[ids[j]] {
-			return depth[ids[i]] < depth[ids[j]]
-		}
 		a, b := nodes[ids[i]], nodes[ids[j]]
-		if a.Name == b.Name {
-			return a.ID < b.ID
+		if a.Y != b.Y {
+			return a.Y < b.Y
 		}
-		return a.Name < b.Name
+		if a.X != b.X {
+			return a.X < b.X
+		}
+		return a.ID < b.ID
 	})
-	rows := map[int]int{}
 	for _, id := range ids {
 		n := nodes[id]
-		n.X = 32 + depth[id]*340
-		n.Y = 48 + rows[depth[id]]*190
-		rows[depth[id]]++
-		nodes[id] = n
+		if n.Provider {
+			out.ProviderCount++
+		}
 		out.Nodes = append(out.Nodes, n)
 		if out.Width < n.X+306 {
 			out.Width = n.X + 306
 		}
-		if out.Height < n.Y+170 {
-			out.Height = n.Y + 170
+	}
+	groups := map[string]mapGroup{}
+	for _, g := range out.Groups {
+		groups[g.ID] = g
+		if out.Height < g.Y+g.Height+16 {
+			out.Height = g.Y + g.Height + 16
 		}
 	}
+	contentWidth, lane := out.Width, 0
 	// Filters change the visible connections without moving the hosting layout.
 	for _, e := range edges {
-		if filter != "all" && e.Type != filter {
+		if filter != "all" && e.Type != filter && !(filter == "runs_on" && e.Placement) {
 			continue
 		}
 		a, b := nodes[e.Source], nodes[e.Target]
-		x1, y1, x2, y2 := a.X+270, a.Y+65, b.X, b.Y+65
-		if a.X > b.X {
-			x1 = a.X
-			x2 = b.X + 270
-		}
-		if a.X == b.X {
-			x1 = a.X + 270
-			x2 = b.X + 270
-			e.Path = fmt.Sprintf("M %d %d C %d %d %d %d %d %d", x1, y1, x1+28, y1, x2+28, y2, x2, y2)
+		if a.Group != b.Group {
+			// Cross-provider links travel through the gaps between columns and
+			// bands, then a dedicated outer lane; they never cut through cards.
+			gutter := contentWidth + 32 + lane*16
+			lane++
+			e.Path = fmt.Sprintf("M %d %d H %d V %d H %d V %d H %d V %d H %d", a.X+270, a.Y+65, a.X+292, groups[a.Group].Y+groups[a.Group].Height-12, gutter, groups[b.Group].Y+46, b.X+292, b.Y+65, b.X+270)
+			if out.Width < gutter+32 {
+				out.Width = gutter + 32
+			}
 		} else {
-			mid := (x1 + x2) / 2
-			e.Path = fmt.Sprintf("M %d %d C %d %d %d %d %d %d", x1, y1, mid, y1, mid, y2, x2, y2)
+			x1, y1, x2, y2 := a.X+270, a.Y+65, b.X, b.Y+65
+			if a.X > b.X {
+				x1 = a.X
+				x2 = b.X + 270
+			}
+			if a.X == b.X {
+				x1 = a.X + 270
+				x2 = b.X + 270
+				e.Path = fmt.Sprintf("M %d %d C %d %d %d %d %d %d", x1, y1, x1+28, y1, x2+28, y2, x2, y2)
+			} else {
+				mid := (x1 + x2) / 2
+				e.Path = fmt.Sprintf("M %d %d C %d %d %d %d %d %d", x1, y1, mid, y1, mid, y2, x2, y2)
+			}
 		}
 		out.Edges = append(out.Edges, e)
 	}
@@ -202,6 +196,8 @@ func buildMap(topology domain.Topology, filter string) mapView {
 
 func relationLabel(kind string) string {
 	switch kind {
+	case "hosted_by":
+		return "Размещён у"
 	case "runs_on":
 		return "Запущен на"
 	case "tunnel_peer":

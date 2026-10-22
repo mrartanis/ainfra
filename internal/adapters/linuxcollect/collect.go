@@ -54,10 +54,11 @@ func (r ExecRunner) Run(ctx context.Context, name string, args ...string) ([]byt
 }
 
 type Collector struct {
-	wireguardSnapshot string
-	run               Runner
-	read              func(string) ([]byte, error)
-	now               func() time.Time
+	wireguardSnapshot                string
+	wireproxyURL, wireproxyPublicKey string
+	run                              Runner
+	read                             func(string) ([]byte, error)
+	now                              func() time.Time
 }
 
 func New(r Runner, read func(string) ([]byte, error), now func() time.Time, snapshots ...string) *Collector {
@@ -379,6 +380,9 @@ func ParseShow(text string) map[string]domain.Package {
 	return out
 }
 func (c *Collector) WireGuard(ctx context.Context) domain.Section {
+	if c.wireproxyURL != "" {
+		return c.wireProxy(ctx)
+	}
 	if c.wireguardSnapshot != "" {
 		return c.readWireGuardSnapshot()
 	}

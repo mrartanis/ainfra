@@ -238,6 +238,14 @@ func (s *Service) reassess(tx Tx, n domain.Node) error {
 	if e != nil {
 		return e
 	}
+	previous, e := decodeNodeList[domain.Finding](tx, "finding", n.ID)
+	if e != nil {
+		return e
+	}
+	previousByID := make(map[string]domain.Finding, len(previous))
+	for _, f := range previous {
+		previousByID[f.ID] = f
+	}
 	seen := map[string]bool{}
 	sources := map[string]bool{}
 	packagesBySource := map[string][]domain.Package{}
@@ -267,10 +275,11 @@ func (s *Service) reassess(tx Tx, n domain.Node) error {
 				continue
 			}
 			seen[key] = true
-			f := domain.Finding{ID: key, NodeID: n.ID, FirstSeen: s.now(), Workflow: "open"}
-			oldErr := tx.Get("finding", key, &f)
-			if oldErr != nil && oldErr != ErrNotFound {
-				return oldErr
+			// Read this node's previous findings once, rather than issuing one
+			// SQLite lookup per advisory, including every unaffected advisory.
+			f, existed := previousByID[key]
+			if !existed {
+				f = domain.Finding{ID: key, NodeID: n.ID, FirstSeen: s.now(), Workflow: "open"}
 			}
 			old := f
 			f.Advisory = a
@@ -290,7 +299,7 @@ func (s *Service) reassess(tx Tx, n domain.Node) error {
 					}
 				}
 			}
-			if f.Assessment == "not_affected" && oldErr == ErrNotFound {
+			if f.Assessment == "not_affected" && !existed {
 				continue
 			}
 			f.InventoryAt = sec.ObservedAt
@@ -306,18 +315,15 @@ func (s *Service) reassess(tx Tx, n domain.Node) error {
 			if e = tx.Put("finding", key, f); e != nil {
 				return e
 			}
-			if oldErr != nil || old.Assessment != f.Assessment || old.Remediation != f.Remediation || old.Workflow != f.Workflow {
+			previousByID[key] = f
+			if !existed || old.Assessment != f.Assessment || old.Remediation != f.Remediation || old.Workflow != f.Workflow {
 				if e = s.event(tx, domain.Principal{ID: "evaluator"}, "finding.changed", key, f.Assessment+"/"+f.Remediation); e != nil {
 					return e
 				}
 			}
 		}
 	}
-	old, e := decodeNodeList[domain.Finding](tx, "finding", n.ID)
-	if e != nil {
-		return e
-	}
-	for _, f := range old {
+	for _, f := range previous {
 		if f.NodeID != n.ID || seen[f.ID] {
 			continue
 		}

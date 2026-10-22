@@ -1,18 +1,30 @@
 {{define "map"}}
 <div class="title"><div><p class="eyebrow">Топология инфраструктуры</p><h1>Карта</h1></div><a href="/">Список узлов →</a></div>
-<p class="muted">Уровни слева направо показывают вложенность: хост → VM → контейнер. Нажмите на узел, чтобы открыть его карточку.</p>
+<p class="muted">Каждый хостер — отдельный блок. Внутри слева направо: хостер / площадка → хост → VM → контейнер; гости сгруппированы под своим хостом. Нажмите на узел, чтобы открыть его карточку.</p>
 <nav class="tabs" aria-label="Связи на карте"><a href="/map" {{if eq .Map.Filter "all"}}aria-current="page"{{end}}>Все связи</a><a href="/map?relation=runs_on" {{if eq .Map.Filter "runs_on"}}aria-current="page"{{end}}>Где запущено</a><a href="/map?relation=tunnel_peer" {{if eq .Map.Filter "tunnel_peer"}}aria-current="page"{{end}}>WireGuard</a></nav>
-<div class="map-summary"><span>{{len .Map.Nodes}} узлов на карте</span><span>{{.Map.PublicCount}} сервисов доступны извне</span><span class="map-key">Сплошная линия — ручная связь · Пунктир — свежее наблюдение</span></div>
+<div class="map-summary"><span>{{.Map.NodeCount}} узлов · {{.Map.ProviderCount}} хостеров / площадок</span><span>{{.Map.PublicCount}} сервисов доступны извне</span><span class="map-key">Сплошная линия — размещение / ручная связь · Пунктир — свежее наблюдение</span></div>
 {{if .Map.Nodes}}
-<div class="map-canvas" tabindex="0" aria-label="Карта связей, прокручивается по горизонтали">
+<section data-map-viewer aria-label="Интерактивная карта">
+<div class="map-zoom" data-map-controls hidden role="group" aria-label="Масштаб карты">
+<button type="button" class="quiet" data-map-zoom="out" aria-label="Уменьшить карту" title="Уменьшить (−)">−</button>
+<output data-map-scale aria-live="polite" aria-label="Масштаб">100%</output>
+<button type="button" class="quiet" data-map-zoom="in" aria-label="Увеличить карту" title="Увеличить (+)">+</button>
+<button type="button" class="quiet" data-map-zoom="reset" title="Исходный масштаб (0)">100%</button>
+<button type="button" class="quiet" data-map-zoom="fit">Уместить по ширине</button>
+<small>Клавиши +, −, 0 при фокусе на карте</small>
+</div>
+<div class="map-canvas" data-map-canvas tabindex="0" aria-label="Карта связей">
 <svg xmlns="http://www.w3.org/2000/svg" width="{{.Map.Width}}" height="{{.Map.Height}}" viewBox="0 0 {{.Map.Width}} {{.Map.Height}}" role="img" aria-labelledby="map-title map-description">
 <title id="map-title">Узлы, размещение и WireGuard</title><desc id="map-description">Все связи также перечислены текстом под диаграммой. Стрелка размещения направлена от гостевой системы к её хосту.</desc>
 <defs><marker id="map-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#80958c"/></marker></defs>
+{{range .Map.Groups}}<g class="map-group"><rect x="16" y="{{.Y}}" width="{{mapGroupWidth $.Map.Width}}" height="{{.Height}}" rx="14"/><text x="34" y="{{mapGroupTitleY .Y}}">{{.Name}} · {{.Count}} {{if .External}}peers{{else}}узлов{{end}}</text></g>{{end}}
 {{range .Map.Edges}}<path class="map-edge {{if eq .Type "tunnel_peer"}}wireguard{{end}} {{if .Observed}}observed{{end}}" d="{{.Path}}" {{if ne .Type "tunnel_peer"}}marker-end="url(#map-arrow)"{{end}}><title>{{.SourceName}} → {{.Label}} → {{.TargetName}} · {{.Name}}</title></path>{{end}}
-{{range .Map.Nodes}}<g class="map-node {{if .Unmanaged}}unmanaged{{end}}" transform="translate({{.X}} {{.Y}})">{{if not .Unmanaged}}<a href="/nodes/{{.ID}}">{{end}}
+{{range .Map.Nodes}}<g class="map-node {{if .Unmanaged}}unmanaged{{end}} {{if .Provider}}provider{{end}}" transform="translate({{.X}} {{.Y}})">{{if and (not .Unmanaged) (not .Provider)}}<a href="/nodes/{{.ID}}">{{end}}
 <rect width="270" height="130" rx="10"/><text x="18" y="26" class="map-kind">{{.Kind}}</text><text x="18" y="54" class="map-name">{{mapText .Name 30}}</text><text x="18" y="78" class="map-address">{{mapText .Address 34}}</text><text x="18" y="108" class="map-services">{{mapText .Services 34}}</text><title>{{.Name}} · {{.Address}} · {{.Services}}</title>
-{{if not .Unmanaged}}</a>{{end}}</g>{{end}}</svg></div>
-<section><h2>Связи</h2><div class="table-wrap"><table><thead><tr><th>Узел</th><th>Связь</th><th>Узел</th><th>Основание</th></tr></thead><tbody>{{range .Map.Edges}}<tr><td>{{.SourceName}}</td><td>{{.Label}}</td><td>{{.TargetName}}</td><td>{{if .Observed}}Наблюдение{{else}}Подтверждено вручную{{end}}<small>{{.Name}}</small></td></tr>{{else}}<tr><td colspan="4">Связей этого типа пока нет.</td></tr>{{end}}</tbody></table></div></section>
+{{if and (not .Unmanaged) (not .Provider)}}</a>{{end}}</g>{{end}}</svg></div>
+</section>
+<script src="/map.js" defer></script>
+<section><h2>Связи</h2><div class="table-wrap"><table><thead><tr><th>Узел</th><th>Связь</th><th>Узел</th><th>Основание</th></tr></thead><tbody>{{range .Map.Edges}}<tr><td>{{.SourceName}}</td><td>{{.Label}}</td><td>{{.TargetName}}</td><td>{{if .Observed}}Наблюдение{{else if .Placement}}Хостер хоста{{else}}Подтверждено вручную{{end}}<small>{{.Name}}</small></td></tr>{{else}}<tr><td colspan="4">Связей этого типа пока нет.</td></tr>{{end}}</tbody></table></div></section>
 <p class="muted">WireGuard показывается по public keys, без определения узла по IP endpoint. Непривязанный peer остаётся вне инвентаря; наблюдения старше 24 часов не показываются.</p>
 {{else}}<p class="empty">Карта пуста. Добавьте узлы и связь «runs_on» в карточке гостевой системы.</p>{{end}}
 {{end}}

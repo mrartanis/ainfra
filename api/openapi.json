@@ -40,6 +40,22 @@
           },
           {
             "in": "query",
+            "name": "provider",
+            "schema": {
+              "description": "Root host provider, inherited by descendants; UNKNOWN when unset",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "host",
+            "schema": {
+              "description": "Host node ID; includes the host and all runs_on descendants",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
             "name": "filter",
             "schema": {
               "enum": [
@@ -689,8 +705,44 @@
         }
       }
     },
+    "/api/v1/ingest/queue": {
+      "get": {
+        "operationId": "get_ingest_queue",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./models.schema.json#/$defs/InboxStatus"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Error; credentials and raw stderr are never included"
+          }
+        }
+      }
+    },
     "/api/v1/ingest/reports": {
       "post": {
+        "description": "HTTP 200 acknowledges a durable SQLite inbox commit (queued), not completed inventory/CVE processing. Invalid/conflicting reports are rejected before receipt. Capacity or persistence failure returns 503.",
         "operationId": "post_ingest_reports",
         "requestBody": {
           "content": {
@@ -712,6 +764,9 @@
               }
             },
             "description": "Success"
+          },
+          "503": {
+            "description": "Inbox full or unable to persist; report has not been acknowledged"
           },
           "default": {
             "content": {

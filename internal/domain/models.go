@@ -40,6 +40,21 @@ type Ack struct {
 	ID     string `json:"report_id"`
 	Status string `json:"status"`
 }
+type InboxReport struct {
+	ID         string    `json:"report_id"`
+	NodeID     string    `json:"node_id"`
+	State      string    `json:"state"`
+	Attempts   int       `json:"attempts"`
+	ReceivedAt time.Time `json:"received_at"`
+	ErrorCode  string    `json:"error_code,omitempty"`
+}
+type InboxStatus struct {
+	Pending    int           `json:"pending"`
+	Processing int           `json:"processing"`
+	Rejected   int           `json:"rejected"`
+	Bytes      int64         `json:"bytes"`
+	Reports    []InboxReport `json:"reports"`
+}
 type Node struct {
 	PaymentChecks       map[string]PaymentObservation `json:"payment_checks"`
 	WireGuardPublicKeys []string                      `json:"wireguard_public_keys"`

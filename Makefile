@@ -6,6 +6,9 @@ GOFMT = $(shell $(GO) env GOROOT)/bin/gofmt
 .PHONY: build test fmt fmt-check lint test-integration test-e2e test-security test-race release release-check
 build:
 	CGO_ENABLED=0 $(GO) build -trimpath -o bin/ ./cmd/...
+.PHONY: build-agent-armv7
+build-agent-armv7:
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 $(GO) build -trimpath -o bin/infra-agent-linux-armv7 ./cmd/infra-agent
 test:
 	$(GO) test ./...
 fmt:

@@ -83,7 +83,7 @@ func run() error {
 		return e
 	}
 	transport := agent.APITransport{Client: &apiclient.Client{Base: c.Server, Token: secret, HTTP: h}}
-	collector := linuxcollect.New(linuxcollect.ExecRunner{}, os.ReadFile, time.Now, c.WireGuardSnapshotFile)
+	collector := linuxcollect.New(linuxcollect.ExecRunner{}, os.ReadFile, time.Now, c.WireGuardSnapshotFile).WithWireProxy(c.WireProxyMetricsURL, c.WireProxyPublicKey)
 	a := agent.New(c, collector, transport, time.Now, app.RandomID, agent.ExecCheckRunner{})
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()

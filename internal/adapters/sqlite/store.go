@@ -247,8 +247,12 @@ func migrate(db *sql.DB) error {
 	return e
 }
 
+const listNodeQuery = "SELECT body FROM records INDEXED BY records_node WHERE kind=? AND json_extract(body,'$.node_id')=? ORDER BY id"
+
 func (t transaction) ListNode(kind, node string) ([]json.RawMessage, error) {
-	rows, e := t.tx.QueryContext(t.ctx, "SELECT body FROM records WHERE kind=? AND json_extract(body,'$.node_id')=? ORDER BY id", kind, node)
+	// ORDER BY id otherwise makes SQLite choose the primary key and scan every
+	// finding. Keep the node lookup indexed, then sort only this node's rows.
+	rows, e := t.tx.QueryContext(t.ctx, listNodeQuery, kind, node)
 	if e != nil {
 		return nil, e
 	}

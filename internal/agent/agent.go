@@ -5,6 +5,7 @@ import (
 	"ainfra/internal/app"
 	"ainfra/internal/domain"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"io"
@@ -17,6 +18,8 @@ import (
 )
 
 type Config struct {
+	WireProxyMetricsURL   string         `json:"wireproxy_metrics_url,omitempty"`
+	WireProxyPublicKey    string         `json:"wireproxy_public_key,omitempty"`
 	WireGuardSnapshotFile string         `json:"wireguard_snapshot_file"`
 	CheckCommands         []CheckCommand `json:"check_commands"`
 	NodeID                string         `json:"node_id"`
@@ -67,6 +70,12 @@ func LoadConfig(path string) (c Config, err error) {
 
 	if c.WireGuardSnapshotFile != "" && !filepath.IsAbs(c.WireGuardSnapshotFile) {
 		return c, errors.New("absolute WireGuard snapshot path required")
+	}
+	if c.WireProxyMetricsURL != "" || c.WireProxyPublicKey != "" {
+		key, e := base64.StdEncoding.DecodeString(c.WireProxyPublicKey)
+		if apiclient.ValidateLocalMetricsURL(c.WireProxyMetricsURL) != nil || e != nil || len(key) != 32 || c.WireGuardSnapshotFile != "" {
+			return c, errors.New("invalid wireproxy source or conflicting WireGuard snapshot")
+		}
 	}
 	if len(c.CheckFiles)+len(c.CheckCommands) > 64 {
 		return c, errors.New("too many checks")

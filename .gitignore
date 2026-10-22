@@ -6,3 +6,6 @@ dist/
 *.db-shm
 *.db-wal
 coverage.out
+
+# Local deployment inventory and operational reports
+/inventory/

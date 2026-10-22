@@ -27,55 +27,42 @@ func contains(ss []string, s string) bool {
 	return false
 }
 func reader(p domain.Principal) bool { return contains([]string{"reader", "editor", "admin"}, p.Role) }
+
+// ValidateQueuedReport rejects invalid identities and conflicting receipts before
+// acknowledging durable receipt. Processing rechecks enrollment after dequeue.
+func (s *Service) ValidateQueuedReport(ctx context.Context, p domain.Principal, r domain.Report) error {
+	if err := validateReport(p, r, s.now()); err != nil {
+		return err
+	}
+	return s.store.Read(ctx, func(tx Tx) error {
+		var n domain.Node
+		if err := tx.Get("node", r.NodeID, &n); err != nil {
+			return err
+		}
+		if n.Instance != "" && n.Instance != r.Instance {
+			return ErrConflict
+		}
+		var receipt struct {
+			Hash string `json:"hash"`
+		}
+		err := tx.Get("receipt", r.ID, &receipt)
+		if err != nil && err != ErrNotFound {
+			return err
+		}
+		if err == nil && receipt.Hash != hash(r) {
+			return ErrConflict
+		}
+		return nil
+	})
+}
 func (s *Service) event(tx Tx, p domain.Principal, kind, id, detail string) error {
 	eventID := s.id()
 	return tx.Put("event", eventID, domain.Event{ID: eventID, Kind: kind, Entity: id, Actor: p.ID, At: s.now(), Detail: detail})
 }
 func (s *Service) IngestReport(ctx context.Context, p domain.Principal, r domain.Report) (ack domain.Ack, err error) {
 	ack = domain.Ack{ID: r.ID, Status: "accepted"}
-	if !contains([]string{"agent", "probe"}, p.Role) || !contains(p.Nodes, r.NodeID) || p.Instance != r.Instance {
-		return ack, ErrForbidden
-	}
-	if r.SchemaVersion != 1 || r.ID == "" || len(r.ID) > 100 || r.Sequence == 0 || r.ObservedAt.IsZero() || r.ObservedAt.After(s.now().Add(5*time.Minute)) || len(r.Collectors) > 16 {
-		return ack, ErrInvalid
-	}
-	totalBytes := 0
-	for name, section := range r.Collectors {
-		totalBytes += len(section.Data)
-		if totalBytes > 16<<20 || len(section.ErrorCode) > 128 {
-			return ack, ErrInvalid
-		}
-		if len(section.Data) > 0 {
-			if e := validateObservation(name, section.Data); e != nil {
-				return ack, e
-			}
-		}
-		if name == "checks" && len(section.Data) > 0 {
-			if e := ValidateChecks(section.Data); e != nil {
-				return ack, e
-			}
-			var checks []Check
-			_ = json.Unmarshal(section.Data, &checks)
-			for _, check := range checks {
-				if check.ObservedAt.After(s.now().Add(5*time.Minute)) || check.ObservedAt.After(r.ObservedAt.Add(5*time.Minute)) || check.ObservedAt.After(section.ObservedAt.Add(5*time.Minute)) {
-					return ack, ErrInvalid
-				}
-			}
-		}
-		if !contains([]string{"os", "packages", "network", "wireguard", "checks", "disks"}, name) || !contains([]string{"ok", "partial", "error", "unsupported", "disabled"}, section.Status) {
-			return ack, ErrInvalid
-		}
-		if section.Status == "ok" || section.Status == "partial" {
-			if section.ObservedAt.IsZero() || section.ObservedAt.After(s.now().Add(5*time.Minute)) || section.ObservedAt.After(r.ObservedAt.Add(5*time.Minute)) || !json.Valid(section.Data) {
-				return ack, ErrInvalid
-			}
-		}
-		if name == "packages" && len(section.Data) > 0 {
-			var data domain.PackageData
-			if json.Unmarshal(section.Data, &data) != nil || len(data.Packages) > 100000 {
-				return ack, ErrInvalid
-			}
-		}
+	if e := validateReport(p, r, s.now()); e != nil {
+		return ack, e
 	}
 	err = s.store.Write(ctx, func(tx Tx) error {
 		var previous struct {
@@ -253,4 +240,53 @@ func (s *Service) Nodes(ctx context.Context, p domain.Principal) (out []domain.N
 	}
 	err = s.store.Read(ctx, func(tx Tx) error { var e error; out, e = decodeList[domain.Node](tx, "node-summary"); return e })
 	return
+}
+
+// validateReport validates untrusted input without taking the inventory write lock.
+func validateReport(p domain.Principal, r domain.Report, now time.Time) error {
+	if !contains([]string{"agent", "probe"}, p.Role) || !contains(p.Nodes, r.NodeID) || p.Instance != r.Instance {
+		return ErrForbidden
+	}
+	if r.SchemaVersion != 1 || r.ID == "" || len(r.ID) > 100 || r.Sequence == 0 || r.ObservedAt.IsZero() || r.ObservedAt.After(now.Add(5*time.Minute)) || len(r.Collectors) > 16 {
+		return ErrInvalid
+	}
+	totalBytes := 0
+	for name, section := range r.Collectors {
+		totalBytes += len(section.Data)
+		if totalBytes > 16<<20 || len(section.ErrorCode) > 128 {
+			return ErrInvalid
+		}
+		if len(section.Data) > 0 {
+			if e := validateObservation(name, section.Data); e != nil {
+				return e
+			}
+		}
+		if name == "checks" && len(section.Data) > 0 {
+			if e := ValidateChecks(section.Data); e != nil {
+				return e
+			}
+			var checks []Check
+			_ = json.Unmarshal(section.Data, &checks)
+			for _, check := range checks {
+				if check.ObservedAt.After(now.Add(5*time.Minute)) || check.ObservedAt.After(r.ObservedAt.Add(5*time.Minute)) || check.ObservedAt.After(section.ObservedAt.Add(5*time.Minute)) {
+					return ErrInvalid
+				}
+			}
+		}
+		if !contains([]string{"os", "packages", "network", "wireguard", "checks", "disks"}, name) || !contains([]string{"ok", "partial", "error", "unsupported", "disabled"}, section.Status) {
+			return ErrInvalid
+		}
+		if section.Status == "ok" || section.Status == "partial" {
+			if section.ObservedAt.IsZero() || section.ObservedAt.After(now.Add(5*time.Minute)) || section.ObservedAt.After(r.ObservedAt.Add(5*time.Minute)) || !json.Valid(section.Data) {
+				return ErrInvalid
+			}
+		}
+		if name == "packages" && len(section.Data) > 0 {
+			var data domain.PackageData
+			if json.Unmarshal(section.Data, &data) != nil || len(data.Packages) > 100000 {
+				return ErrInvalid
+			}
+		}
+	}
+	return nil
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"ainfra/internal/adapters/feeds"
 	"ainfra/internal/adapters/httpapi"
+	"ainfra/internal/adapters/reportinbox"
 	"ainfra/internal/adapters/sqlite"
 	"ainfra/internal/agent"
 	"ainfra/internal/apiclient"
@@ -39,6 +40,7 @@ func run() error {
 	}
 	f := flag.NewFlagSet("infra-server "+command, flag.ContinueOnError)
 	db := f.String("db", ".local/infra.db", "SQLite path")
+	inboxPath := f.String("inbox-db", "", "durable report inbox SQLite (default DB path + .inbox)")
 	listen := f.String("listen", "127.0.0.1:8080", "HTTP listen (TLS terminates at proxy)")
 	output := f.String("output", "", "private output file for bootstrap token or backup")
 	role := f.String("role", "admin", "bootstrap token role")
@@ -99,6 +101,20 @@ func run() error {
 		if *output == "" {
 			return fmt.Errorf("--output required")
 		}
+		if _, err := os.Stat(*output); !os.IsNotExist(err) {
+			return fmt.Errorf("output exists or inaccessible")
+		}
+		if *inboxPath == "" {
+			*inboxPath = *db + ".inbox"
+		}
+		if _, err := os.Stat(*inboxPath); err == nil {
+			// Inbox first: processing rows replay safely against a later inventory snapshot.
+			if err := reportinbox.Backup(ctx, *inboxPath, *output+".inbox"); err != nil {
+				return err
+			}
+		} else if !os.IsNotExist(err) {
+			return err
+		}
 		return store.Backup(ctx, *output)
 	case "prune":
 		result, err := store.Prune(ctx, policy, time.Now())
@@ -109,6 +125,14 @@ func run() error {
 	case "sync-feeds":
 		return syncFeeds(ctx, svc, filepath.Join(filepath.Dir(*db), "feed-staging"))
 	case "serve":
+		if *inboxPath == "" {
+			*inboxPath = *db + ".inbox"
+		}
+		inbox, err := reportinbox.Open(*inboxPath)
+		if err != nil {
+			return err
+		}
+		defer inbox.Close()
 		ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 		defer stop()
 		if _, err := store.Prune(ctx, policy, time.Now()); err != nil {
@@ -122,6 +146,8 @@ func run() error {
 		defer listener.Close()
 		var workers sync.WaitGroup
 		defer func() { stop(); workers.Wait() }()
+		workers.Add(1)
+		go func() { defer workers.Done(); inbox.Run(ctx, svc.IngestReport, slog.Default()) }()
 		workers.Add(1)
 		go func() {
 			defer workers.Done()
@@ -154,7 +180,7 @@ func run() error {
 				}
 			}()
 		}
-		server := &http.Server{Addr: *listen, Handler: httpapi.NewWithLogger(svc, slog.Default()), ErrorLog: slog.NewLogLogger(slog.Default().Handler(), slog.LevelError), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 35 * time.Second, WriteTimeout: 35 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 << 10}
+		server := &http.Server{Addr: *listen, Handler: httpapi.NewWithInbox(svc, slog.Default(), inbox), ErrorLog: slog.NewLogLogger(slog.Default().Handler(), slog.LevelError), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 35 * time.Second, WriteTimeout: 35 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 << 10}
 		slog.Info("API listening", "address", listener.Addr().String(), "transport", "http")
 		return serveUntilCancelled(ctx, server, listener)
 	default:

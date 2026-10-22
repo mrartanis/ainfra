@@ -22,7 +22,7 @@ func TestMapNestedHostingPeersAndSafeRendering(t *testing.T) {
 	for _, n := range view.Nodes {
 		x[n.ID] = n.X
 	}
-	if x["host"] >= x["vm"] || x["vm"] >= x["container"] || len(view.Nodes) != 4 || len(view.Edges) != 3 {
+	if x["host"] >= x["vm"] || x["vm"] >= x["container"] || len(view.Nodes) != 5 || len(view.Edges) != 4 || view.NodeCount != 3 || view.ProviderCount != 1 || x["provider:UNKNOWN"] >= x["host"] {
 		t.Fatalf("%+v", view)
 	}
 	wg := buildMap(topology, "tunnel_peer")
@@ -33,7 +33,7 @@ func TestMapNestedHostingPeersAndSafeRendering(t *testing.T) {
 	response := httptest.NewRecorder()
 	u.render(response, map[string]any{"Page": "map", "Map": view})
 	body := response.Body.String()
-	for _, want := range []string{"</html>", "unknown-key", "Jellyfin", "&lt;script&gt;", "Запущен на", "WireGuard"} {
+	for _, want := range []string{"</html>", "unknown-key", "Jellyfin", "&lt;script&gt;", "Запущен на", "WireGuard", `src="/map.js" defer`, `data-map-zoom="in"`, `data-map-zoom="out"`, `data-map-zoom="fit"`, `data-map-zoom="reset"`} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("missing %q: %s", want, body)
 		}
@@ -54,7 +54,7 @@ func TestMapCycleDoesNotHangAndMultipleParentsUseDeepestLevel(t *testing.T) {
 		t.Fatal(x)
 	}
 	topology.Relations = append(topology.Relations, domain.Relation{Source: "a", Target: "c", Type: "runs_on"})
-	if len(buildMap(topology, "all").Nodes) != 3 {
+	if len(buildMap(topology, "all").Nodes) != 4 {
 		t.Fatal("lost cycle nodes")
 	}
 }
@@ -70,6 +70,113 @@ func TestPackageStateDoesNotFlagEqualOrOlderCandidates(t *testing.T) {
 	} {
 		if got := packageState(map[string]any{"version": tc.installed, "candidate": tc.candidate}); got != tc.want {
 			t.Fatalf("%+v: %s", tc, got)
+		}
+	}
+}
+
+func TestProviderGroupsAndFilterOptions(t *testing.T) {
+	topology := domain.Topology{Nodes: []domain.Node{{ID: "host", Name: "Host", Labels: map[string]string{"provider": "ExampleProvider"}}, {ID: "vm", Name: "VM"}, {ID: "ct", Name: "Container"}, {ID: "other", Name: "Unknown host"}}, Relations: []domain.Relation{{Source: "vm", Target: "host", Type: "runs_on"}, {Source: "ct", Target: "vm", Type: "runs_on"}}}
+	view := buildMap(topology, "runs_on")
+	if view.ProviderCount != 2 || view.NodeCount != 4 || len(view.Edges) != 4 {
+		t.Fatal(view)
+	}
+	options := hostingFilters(topology.Nodes, topology.Relations)
+	if len(options.Providers) != 2 || options.Providers[0] != "ExampleProvider" || options.Providers[1] != "UNKNOWN" || len(options.Hosts) != 3 {
+		t.Fatal(options)
+	}
+	u := New("http://unused", nil, false, time.Now)
+	w := httptest.NewRecorder()
+	u.render(w, map[string]any{"Page": "map", "Map": view})
+	if strings.Contains(w.Body.String(), `href="/nodes/provider:`) || !strings.Contains(w.Body.String(), "UNKNOWN") {
+		t.Fatal(w.Body.String())
+	}
+	w = httptest.NewRecorder()
+	u.render(w, map[string]any{"Page": "nodes", "HostingFilters": options, "Provider": "ExampleProvider", "Host": "vm"})
+	for _, want := range []string{`name="provider"`, `name="host"`, `value="vm" selected`, `value="ExampleProvider" selected`, "По выбранным фильтрам узлов нет"} {
+		if !strings.Contains(w.Body.String(), want) {
+			t.Fatalf("missing %s: %s", want, w.Body.String())
+		}
+	}
+}
+
+func TestProviderBandsAndHostSubtreesNeverInterleave(t *testing.T) {
+	topology := domain.Topology{Nodes: []domain.Node{
+		{ID: "ha", Name: "Host A", Labels: map[string]string{"provider": "Provider A"}},
+		{ID: "hb", Name: "Host B", Labels: map[string]string{"provider": "Provider A"}},
+		{ID: "hc", Name: "Host C", Labels: map[string]string{"provider": "Provider B"}},
+		{ID: "va", Name: "Z VM A"}, {ID: "ca", Name: "A container A"}, {ID: "vb", Name: "A VM B"}, {ID: "cb", Name: "Z container B"}, {ID: "vc", Name: "VM C"},
+	}, Relations: []domain.Relation{
+		{Source: "va", Target: "ha", Type: "runs_on"}, {Source: "ca", Target: "va", Type: "runs_on"},
+		{Source: "vb", Target: "hb", Type: "runs_on"}, {Source: "cb", Target: "vb", Type: "runs_on"}, {Source: "vc", Target: "hc", Type: "runs_on"},
+		{Source: "ca", Target: "vc", Type: "tunnel_peer"},
+	}}
+	view := buildMap(topology, "all")
+	if len(view.Groups) != 2 {
+		t.Fatal(view.Groups)
+	}
+	for i, g := range view.Groups {
+		if i > 0 && g.Y-(view.Groups[i-1].Y+view.Groups[i-1].Height) < 200 {
+			t.Fatal("provider gap too small", view.Groups)
+		}
+		for _, n := range view.Nodes {
+			if n.Group == g.ID && (n.Y < g.Y+64 || n.Y+130 > g.Y+g.Height-32) {
+				t.Fatal("node escaped provider band", g, n)
+			}
+		}
+	}
+	positions := map[string]mapNode{}
+	for _, n := range view.Nodes {
+		positions[n.ID] = n
+	}
+	for _, a := range []string{"ha", "va", "ca"} {
+		for _, b := range []string{"hb", "vb", "cb"} {
+			if positions[a].Y+130 >= positions[b].Y {
+				t.Fatal("sibling host subtrees interleave", a, b, positions)
+			}
+		}
+	}
+	for i, a := range view.Nodes {
+		for _, b := range view.Nodes[i+1:] {
+			if a.X == b.X && a.Y < b.Y+130 && b.Y < a.Y+130 {
+				t.Fatal("cards overlap", a, b)
+			}
+		}
+	}
+	for _, e := range view.Edges {
+		if e.Type == "tunnel_peer" && (!strings.Contains(e.Path, " H ") || !strings.Contains(e.Path, " V ")) {
+			t.Fatal("cross-provider link not routed outside cards", e)
+		}
+	}
+	filtered := buildMap(topology, "runs_on")
+	for _, n := range filtered.Nodes {
+		p := positions[n.ID]
+		if p.X != n.X || p.Y != n.Y {
+			t.Fatal("edge filtering moved nodes", n, p)
+		}
+	}
+	// Input order and maps must not affect the placement or primary DAG parent.
+	for i, j := 0, len(topology.Nodes)-1; i < j; i, j = i+1, j-1 {
+		topology.Nodes[i], topology.Nodes[j] = topology.Nodes[j], topology.Nodes[i]
+	}
+	for i, j := 0, len(topology.Relations)-1; i < j; i, j = i+1, j-1 {
+		topology.Relations[i], topology.Relations[j] = topology.Relations[j], topology.Relations[i]
+	}
+	for _, n := range buildMap(topology, "all").Nodes {
+		p := positions[n.ID]
+		if p.X != n.X || p.Y != n.Y {
+			t.Fatal("unstable layout", n, p)
+		}
+	}
+}
+
+func TestUnknownWireGuardPeersDoNotInheritObservedHostProvider(t *testing.T) {
+	view := buildMap(domain.Topology{Nodes: []domain.Node{{ID: "edge", Labels: map[string]string{"provider": "ExampleSite"}}}, UnmanagedPeers: []domain.WireGuardPeer{{NodeID: "edge", PublicKey: "external"}}}, "all")
+	if view.ProviderCount != 1 || len(view.Groups) != 2 || !view.Groups[1].External {
+		t.Fatal(view)
+	}
+	for _, n := range view.Nodes {
+		if n.Unmanaged && n.Group != "external-wireguard-peers" {
+			t.Fatal("unknown placement shown as local provider", n)
 		}
 	}
 }

@@ -12,6 +12,12 @@ var ErrForbidden = errors.New("forbidden")
 var ErrConflict = errors.New("conflict")
 var ErrNotFound = errors.New("not_found")
 var ErrInvalid = errors.New("invalid_input")
+var ErrUnavailable = errors.New("temporarily_unavailable")
+
+type ReportInbox interface {
+	Enqueue(context.Context, domain.Principal, domain.Report) (domain.Ack, error)
+	Status(context.Context) (domain.InboxStatus, error)
+}
 
 type Tx interface {
 	TopologyNodes() ([]domain.TopologyNode, error)

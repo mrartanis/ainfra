@@ -407,7 +407,7 @@ func (s *Service) Settings(ctx context.Context, p domain.Principal) (out map[str
 	return
 }
 
-func (s *Service) QueryAttention(ctx context.Context, p domain.Principal, filter, order string) ([]domain.Attention, error) {
+func (s *Service) QueryAttention(ctx context.Context, p domain.Principal, filter, order, provider, host string) ([]domain.Attention, error) {
 	if !contains([]string{"", "attention", "stale"}, filter) || !contains([]string{"", "attention", "name"}, order) {
 		return nil, ErrInvalid
 	}
@@ -416,7 +416,29 @@ func (s *Service) QueryAttention(ctx context.Context, p domain.Principal, filter
 		return nil, e
 	}
 	out := []domain.Attention{}
+	var hosting domain.HostingIndex
+	var descendants map[string]bool
+	if provider != "" || host != "" {
+		nodes, err := s.Nodes(ctx, p)
+		if err != nil {
+			return nil, err
+		}
+		relations, err := s.Relations(ctx, p)
+		if err != nil {
+			return nil, err
+		}
+		hosting = domain.NewHostingIndex(nodes, relations)
+		if host != "" {
+			descendants = hosting.Descendants(host)
+		}
+	}
 	for _, r := range rows {
+		if host != "" && !descendants[r.NodeID] {
+			continue
+		}
+		if provider != "" && !contains(hosting.Providers(r.NodeID), provider) {
+			continue
+		}
 		if filter == "attention" && len(r.Reasons) == 0 {
 			continue
 		}

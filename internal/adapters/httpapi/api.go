@@ -19,11 +19,15 @@ const MaxBody = 16 << 20
 type API struct {
 	s      *app.Service
 	logger *slog.Logger
+	inbox  app.ReportInbox
 }
 
 func New(s *app.Service) http.Handler { return NewWithLogger(s, nil) }
 func NewWithLogger(s *app.Service, logger *slog.Logger) http.Handler {
 	return &API{s: s, logger: logger}
+}
+func NewWithInbox(s *app.Service, logger *slog.Logger, inbox app.ReportInbox) http.Handler {
+	return &API{s: s, logger: logger, inbox: inbox}
 }
 func write(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
@@ -34,6 +38,9 @@ func failure(w http.ResponseWriter, e error) {
 	status := 500
 	code := "internal_error"
 	switch {
+	case errors.Is(e, app.ErrUnavailable):
+		status = 503
+		code = "temporarily_unavailable"
 	case errors.Is(e, app.ErrForbidden):
 		status = 403
 		code = "forbidden"
@@ -82,6 +89,12 @@ func (a *API) serve(w http.ResponseWriter, r *http.Request) {
 		defer cancel()
 		if e := a.s.Ready(ctx); e != nil {
 			write(w, 503, map[string]string{"status": "unavailable"})
+		} else if a.inbox != nil {
+			if _, e := a.inbox.Status(ctx); e != nil {
+				write(w, 503, map[string]string{"status": "unavailable"})
+			} else {
+				write(w, 200, map[string]string{"status": "ready"})
+			}
 		} else {
 			write(w, 200, map[string]string{"status": "ready"})
 		}
@@ -151,7 +164,19 @@ func (a *API) serve(w http.ResponseWriter, r *http.Request) {
 		if !body(&v) {
 			return
 		}
-		out, e = a.s.IngestReport(ctx, p, v)
+		if a.inbox == nil {
+			out, e = a.s.IngestReport(ctx, p, v)
+		} else if e = a.s.ValidateQueuedReport(ctx, p, v); e == nil {
+			out, e = a.inbox.Enqueue(ctx, p, v)
+		}
+	case path == "ingest/queue" && read:
+		if p.Role != "admin" && p.Role != "reader" && p.Role != "editor" {
+			e = app.ErrForbidden
+		} else if a.inbox == nil {
+			out = domain.InboxStatus{Reports: []domain.InboxReport{}}
+		} else {
+			out, e = a.inbox.Status(ctx)
+		}
 	case path == "nodes" && read:
 		out, e = a.s.Nodes(ctx, p)
 	case path == "nodes" && r.Method == "POST":
@@ -194,7 +219,7 @@ func (a *API) serve(w http.ResponseWriter, r *http.Request) {
 		e = a.s.Reenroll(ctx, p, id, v.Instance, revision)
 		out = map[string]bool{"ok": e == nil}
 	case path == "attention" && read:
-		out, e = a.s.QueryAttention(ctx, p, r.URL.Query().Get("filter"), r.URL.Query().Get("sort"))
+		out, e = a.s.QueryAttention(ctx, p, r.URL.Query().Get("filter"), r.URL.Query().Get("sort"), r.URL.Query().Get("provider"), r.URL.Query().Get("host"))
 	case path == "findings" && read:
 		out, e = a.s.Findings(ctx, p, r.URL.Query().Get("node"))
 	case parts[0] == "findings" && len(parts) == 3 && parts[2] == "suppress" && r.Method == "POST":

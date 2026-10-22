@@ -707,6 +707,72 @@
       ],
       "type": "object"
     },
+    "InboxReport": {
+      "additionalProperties": false,
+      "properties": {
+        "attempts": {
+          "type": "integer"
+        },
+        "error_code": {
+          "type": "string"
+        },
+        "node_id": {
+          "type": "string"
+        },
+        "received_at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "report_id": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "report_id",
+        "node_id",
+        "state",
+        "attempts",
+        "received_at"
+      ],
+      "type": "object"
+    },
+    "InboxStatus": {
+      "additionalProperties": false,
+      "properties": {
+        "bytes": {
+          "type": "integer"
+        },
+        "pending": {
+          "type": "integer"
+        },
+        "processing": {
+          "type": "integer"
+        },
+        "rejected": {
+          "type": "integer"
+        },
+        "reports": {
+          "items": {
+            "$ref": "#/$defs/InboxReport"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "pending",
+        "processing",
+        "rejected",
+        "bytes",
+        "reports"
+      ],
+      "type": "object"
+    },
     "IssuedToken": {
       "additionalProperties": false,
       "properties": {

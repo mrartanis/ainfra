@@ -48,7 +48,7 @@ type UI struct {
 }
 
 func New(base string, client *http.Client, dev bool, now func() time.Time) *UI {
-	funcs := template.FuncMap{"date": func(v any) string {
+	funcs := template.FuncMap{"mapGroupWidth": func(width int) int { return width - 32 }, "mapGroupTitleY": func(y int) int { return y + 28 }, "date": func(v any) string {
 		s, _ := v.(string)
 		if len(s) >= 10 && !strings.HasPrefix(s, "0001-") {
 			return s[:10]
@@ -134,7 +134,11 @@ func (u *UI) render(w http.ResponseWriter, data map[string]any) {
 	}
 }
 func (u *UI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Security-Policy", "default-src 'none'; style-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'")
+	csp := "default-src 'none'; style-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"
+	if r.URL.Path == "/map" || r.URL.Path == "/map.js" {
+		csp += "; script-src 'self'"
+	}
+	w.Header().Set("Content-Security-Policy", csp)
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Referrer-Policy", "no-referrer")
 	w.Header().Set("Cache-Control", "no-store")
@@ -142,6 +146,19 @@ func (u *UI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/css")
 		b, _ := assets.ReadFile("templates/style.css")
 		w.Write(b)
+		return
+	}
+	if r.URL.Path == "/map.js" {
+		if r.Method != "GET" && r.Method != "HEAD" {
+			w.Header().Set("Allow", "GET, HEAD")
+			w.WriteHeader(405)
+			return
+		}
+		w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
+		b, _ := assets.ReadFile("templates/map.js")
+		if r.Method == "GET" {
+			w.Write(b)
+		}
 		return
 	}
 	if r.Method != "GET" && r.Method != "POST" {
@@ -302,7 +319,15 @@ func (u *UI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		data["Page"], data["Title"] = "map", "Карта"
 		data["Map"] = buildMap(topology, r.URL.Query().Get("relation"))
 	case path == "/":
-		if e := get("attention?filter="+url.QueryEscape(r.URL.Query().Get("filter"))+"&sort="+url.QueryEscape(r.URL.Query().Get("sort")), "Attention"); e != nil {
+		query := r.URL.Query()
+		var topology domain.Topology
+		if e := client.Do(ctx, "GET", "topology", nil, &topology, 0); e != nil {
+			fail(e)
+			return
+		}
+		data["HostingFilters"] = hostingFilters(topology.Nodes, topology.Relations)
+		data["Provider"], data["Host"] = query.Get("provider"), query.Get("host")
+		if e := get("attention?filter="+url.QueryEscape(query.Get("filter"))+"&sort="+url.QueryEscape(query.Get("sort"))+"&provider="+url.QueryEscape(query.Get("provider"))+"&host="+url.QueryEscape(query.Get("host")), "Attention"); e != nil {
 			fail(e)
 			return
 		}

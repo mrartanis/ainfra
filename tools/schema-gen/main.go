@@ -75,7 +75,7 @@ func write(path string, v any) {
 	}
 }
 func main() {
-	for _, v := range []any{domain.Report{}, domain.Ack{}, domain.Node{}, domain.Document{}, domain.Principal{}, domain.Token{}, domain.Relation{}, domain.RelationSuggestion{}, domain.PackageData{}, domain.Finding{}, domain.Feed{}, domain.Attention{}, domain.Event{}, domain.Topology{}} {
+	for _, v := range []any{domain.Report{}, domain.Ack{}, domain.InboxStatus{}, domain.Node{}, domain.Document{}, domain.Principal{}, domain.Token{}, domain.Relation{}, domain.RelationSuggestion{}, domain.PackageData{}, domain.Finding{}, domain.Feed{}, domain.Attention{}, domain.Event{}, domain.Topology{}} {
 		shape(reflect.TypeOf(v))
 	}
 	defs["PlanStatusInput"] = schema{"type": "object", "additionalProperties": false, "required": []string{"status"}, "properties": schema{"status": schema{"enum": []string{"completed", "cancelled"}}}}
@@ -123,7 +123,7 @@ func main() {
 	}
 	routes := []route{
 		{"topology", "get", "", "Topology", false},
-		{"ingest/reports", "post", "Report", "Ack", false}, {"nodes", "get", "", "Node", true}, {"nodes", "post", "NodeInput", "Node", false}, {"nodes/{id}", "get", "", "Node", false}, {"nodes/{id}", "patch", "NodeInput", "Node", false}, {"nodes/{id}/packages", "get", "", "PackageData", false}, {"nodes/{id}/findings", "get", "", "Finding", true}, {"nodes/{id}/context", "get", "", "markdown", false}, {"nodes/{id}/pay", "post", "", "Node", false}, {"nodes/{id}/reenroll", "post", "ReenrollInput", "OK", false}, {"attention", "get", "", "Attention", true}, {"search", "get", "", "object", true}, {"findings", "get", "", "Finding", true}, {"findings/{id}/suppress", "post", "SuppressionInput", "OK", false}, {"feed-status", "get", "", "Feed", true}, {"documents", "get", "", "Document", true}, {"documents", "post", "DocumentInput", "Document", false}, {"documents/{id}", "get", "", "Document", false}, {"documents/{id}", "patch", "DocumentInput", "Document", false}, {"documents/{id}/approve", "post", "", "Document", false}, {"documents/{id}/status", "post", "PlanStatusInput", "Document", false}, {"relation-suggestions", "get", "", "RelationSuggestion", true}, {"relations", "get", "", "Relation", true}, {"relations", "post", "RelationInput", "Relation", false}, {"relations/{id}", "delete", "", "OK", false}, {"events", "get", "", "Event", true}, {"tokens", "get", "", "Token", true}, {"tokens", "post", "PrincipalInput", "IssuedToken", false}, {"tokens/{id}", "delete", "", "OK", false}, {"me", "get", "", "Principal", false}, {"settings", "get", "", "Settings", false}}
+		{"ingest/reports", "post", "Report", "Ack", false}, {"ingest/queue", "get", "", "InboxStatus", false}, {"nodes", "get", "", "Node", true}, {"nodes", "post", "NodeInput", "Node", false}, {"nodes/{id}", "get", "", "Node", false}, {"nodes/{id}", "patch", "NodeInput", "Node", false}, {"nodes/{id}/packages", "get", "", "PackageData", false}, {"nodes/{id}/findings", "get", "", "Finding", true}, {"nodes/{id}/context", "get", "", "markdown", false}, {"nodes/{id}/pay", "post", "", "Node", false}, {"nodes/{id}/reenroll", "post", "ReenrollInput", "OK", false}, {"attention", "get", "", "Attention", true}, {"search", "get", "", "object", true}, {"findings", "get", "", "Finding", true}, {"findings/{id}/suppress", "post", "SuppressionInput", "OK", false}, {"feed-status", "get", "", "Feed", true}, {"documents", "get", "", "Document", true}, {"documents", "post", "DocumentInput", "Document", false}, {"documents/{id}", "get", "", "Document", false}, {"documents/{id}", "patch", "DocumentInput", "Document", false}, {"documents/{id}/approve", "post", "", "Document", false}, {"documents/{id}/status", "post", "PlanStatusInput", "Document", false}, {"relation-suggestions", "get", "", "RelationSuggestion", true}, {"relations", "get", "", "Relation", true}, {"relations", "post", "RelationInput", "Relation", false}, {"relations/{id}", "delete", "", "OK", false}, {"events", "get", "", "Event", true}, {"tokens", "get", "", "Token", true}, {"tokens", "post", "PrincipalInput", "IssuedToken", false}, {"tokens/{id}", "delete", "", "OK", false}, {"me", "get", "", "Principal", false}, {"settings", "get", "", "Settings", false}}
 	ref := func(name string) any {
 		if name == "object" {
 			return schema{"type": "object"}
@@ -151,6 +151,10 @@ func main() {
 			status = "201"
 		}
 		operation := schema{"operationId": strings.NewReplacer("/", "_", "{", "", "}", "").Replace(r.method + "_" + r.path), "responses": schema{status: schema{"description": "Success", "content": schema{contentType: schema{"schema": response}}}, "default": schema{"description": "Error; credentials and raw stderr are never included", "content": schema{"application/json": schema{"schema": schema{"type": "object", "required": []string{"error"}, "properties": schema{"error": schema{"type": "string"}}}}}}}}
+		if r.path == "ingest/reports" {
+			operation["description"] = "HTTP 200 acknowledges a durable SQLite inbox commit (queued), not completed inventory/CVE processing. Invalid/conflicting reports are rejected before receipt. Capacity or persistence failure returns 503."
+			operation["responses"].(schema)["503"] = schema{"description": "Inbox full or unable to persist; report has not been acknowledged"}
+		}
 		params := []any{}
 		if r.array || strings.HasSuffix(r.path, "/packages") {
 			params = append(params, schema{"name": "limit", "in": "query", "schema": schema{"type": "integer", "minimum": 1, "maximum": 1000, "default": 100}}, schema{"name": "offset", "in": "query", "schema": schema{"type": "integer", "minimum": 0, "default": 0}})
@@ -169,6 +173,8 @@ func main() {
 			case "nodes/{id}/packages":
 				query("upgradable", schema{"type": "boolean", "default": false})
 			case "attention":
+				query("provider", schema{"type": "string", "description": "Root host provider, inherited by descendants; UNKNOWN when unset"})
+				query("host", schema{"type": "string", "description": "Host node ID; includes the host and all runs_on descendants"})
 				query("filter", schema{"enum": []string{"", "attention", "stale"}})
 				query("sort", schema{"enum": []string{"", "attention", "name"}})
 			case "search":
