@@ -179,9 +179,19 @@
             "array",
             "null"
           ]
+        },
+        "services": {
+          "items": {
+            "$ref": "#/$defs/Service"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
         }
       },
       "required": [
+        "services",
         "purpose",
         "addresses",
         "node_id",
@@ -2183,6 +2193,54 @@
       ],
       "type": "object"
     },
+    "Topology": {
+      "additionalProperties": false,
+      "properties": {
+        "nodes": {
+          "items": {
+            "$ref": "#/$defs/Node"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "relations": {
+          "items": {
+            "$ref": "#/$defs/Relation"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "suggestions": {
+          "items": {
+            "$ref": "#/$defs/RelationSuggestion"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "unmanaged_peers": {
+          "items": {
+            "$ref": "#/$defs/WireGuardPeer"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "nodes",
+        "relations",
+        "suggestions",
+        "unmanaged_peers"
+      ],
+      "type": "object"
+    },
     "VersionEvent": {
       "additionalProperties": false,
       "properties": {
@@ -2200,6 +2258,31 @@
         }
       },
       "required": [],
+      "type": "object"
+    },
+    "WireGuardPeer": {
+      "additionalProperties": false,
+      "properties": {
+        "interface": {
+          "type": "string"
+        },
+        "node_id": {
+          "type": "string"
+        },
+        "observed_at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "public_key": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "node_id",
+        "interface",
+        "public_key",
+        "observed_at"
+      ],
       "type": "object"
     }
   },

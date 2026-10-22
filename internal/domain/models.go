@@ -243,6 +243,7 @@ type Finding struct {
 	FeedAt          time.Time `json:"feed_at"`
 }
 type Attention struct {
+	Services   []Service `json:"services"`
 	Purpose    string    `json:"purpose"`
 	Addresses  []string  `json:"addresses"`
 	NodeID     string    `json:"node_id"`
@@ -270,6 +271,21 @@ type RelationSuggestion struct {
 	Provenance string    `json:"provenance"`
 	ObservedAt time.Time `json:"observed_at"`
 	Evidence   string    `json:"evidence"`
+}
+
+// Topology keeps package inventories out of the map response.
+type Topology struct {
+	Nodes          []Node               `json:"nodes"`
+	Relations      []Relation           `json:"relations"`
+	Suggestions    []RelationSuggestion `json:"suggestions"`
+	UnmanagedPeers []WireGuardPeer      `json:"unmanaged_peers"`
+}
+
+type WireGuardPeer struct {
+	NodeID     string    `json:"node_id"`
+	Interface  string    `json:"interface"`
+	PublicKey  string    `json:"public_key"`
+	ObservedAt time.Time `json:"observed_at"`
 }
 
 // PaymentObservation is check evidence, independent of the manual payment schedule.

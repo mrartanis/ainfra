@@ -45,6 +45,10 @@ func TestTopologySuggestionsRequireConfirmedKeysAndPreserveRouteIdentity(t *test
 		t.Fatal("autodetect modified manual topology", relations, err)
 	}
 	var selected domain.Relation
+	graph, err := svc.Topology(ctx, admin)
+	if err != nil || len(graph.UnmanagedPeers) != 1 || graph.UnmanagedPeers[0].PublicKey != key(3) || len(graph.Relations) != 0 {
+		t.Fatal("unknown peer must stay outside inventory and manual graph", graph, err)
+	}
 	for _, s := range suggestions {
 		if s.Target != b.ID || s.ObservedAt != now || s.Provenance != "observed" {
 			t.Fatal(s)

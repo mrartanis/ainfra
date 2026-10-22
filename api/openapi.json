@@ -1762,6 +1762,41 @@
           }
         }
       }
+    },
+    "/api/v1/topology": {
+      "get": {
+        "operationId": "get_topology",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./models.schema.json#/$defs/Topology"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Error; credentials and raw stderr are never included"
+          }
+        }
+      }
     }
   },
   "security": [

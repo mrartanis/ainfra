@@ -75,7 +75,7 @@ func write(path string, v any) {
 	}
 }
 func main() {
-	for _, v := range []any{domain.Report{}, domain.Ack{}, domain.Node{}, domain.Document{}, domain.Principal{}, domain.Token{}, domain.Relation{}, domain.RelationSuggestion{}, domain.PackageData{}, domain.Finding{}, domain.Feed{}, domain.Attention{}, domain.Event{}} {
+	for _, v := range []any{domain.Report{}, domain.Ack{}, domain.Node{}, domain.Document{}, domain.Principal{}, domain.Token{}, domain.Relation{}, domain.RelationSuggestion{}, domain.PackageData{}, domain.Finding{}, domain.Feed{}, domain.Attention{}, domain.Event{}, domain.Topology{}} {
 		shape(reflect.TypeOf(v))
 	}
 	defs["PlanStatusInput"] = schema{"type": "object", "additionalProperties": false, "required": []string{"status"}, "properties": schema{"status": schema{"enum": []string{"completed", "cancelled"}}}}
@@ -122,6 +122,7 @@ func main() {
 		array                       bool
 	}
 	routes := []route{
+		{"topology", "get", "", "Topology", false},
 		{"ingest/reports", "post", "Report", "Ack", false}, {"nodes", "get", "", "Node", true}, {"nodes", "post", "NodeInput", "Node", false}, {"nodes/{id}", "get", "", "Node", false}, {"nodes/{id}", "patch", "NodeInput", "Node", false}, {"nodes/{id}/packages", "get", "", "PackageData", false}, {"nodes/{id}/findings", "get", "", "Finding", true}, {"nodes/{id}/context", "get", "", "markdown", false}, {"nodes/{id}/pay", "post", "", "Node", false}, {"nodes/{id}/reenroll", "post", "ReenrollInput", "OK", false}, {"attention", "get", "", "Attention", true}, {"search", "get", "", "object", true}, {"findings", "get", "", "Finding", true}, {"findings/{id}/suppress", "post", "SuppressionInput", "OK", false}, {"feed-status", "get", "", "Feed", true}, {"documents", "get", "", "Document", true}, {"documents", "post", "DocumentInput", "Document", false}, {"documents/{id}", "get", "", "Document", false}, {"documents/{id}", "patch", "DocumentInput", "Document", false}, {"documents/{id}/approve", "post", "", "Document", false}, {"documents/{id}/status", "post", "PlanStatusInput", "Document", false}, {"relation-suggestions", "get", "", "RelationSuggestion", true}, {"relations", "get", "", "Relation", true}, {"relations", "post", "RelationInput", "Relation", false}, {"relations/{id}", "delete", "", "OK", false}, {"events", "get", "", "Event", true}, {"tokens", "get", "", "Token", true}, {"tokens", "post", "PrincipalInput", "IssuedToken", false}, {"tokens/{id}", "delete", "", "OK", false}, {"me", "get", "", "Principal", false}, {"settings", "get", "", "Settings", false}}
 	ref := func(name string) any {
 		if name == "object" {
