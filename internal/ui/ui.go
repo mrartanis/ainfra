@@ -3,6 +3,7 @@ package ui
 
 import (
 	"ainfra/internal/apiclient"
+	"ainfra/internal/domain"
 	"bytes"
 	"context"
 	"crypto/rand"
@@ -84,7 +85,18 @@ func New(base string, client *http.Client, dev bool, now func() time.Time) *UI {
 			return "неизвестно"
 		}
 		return s
-	}, "count": func(v any) int { a, _ := v.([]any); return len(a) }}
+	}, "count": func(v any) int { a, _ := v.([]any); return len(a) },
+		"mapText": shortMapText, "packageState": packageState,
+		"publicServices": func(v any) []any {
+			rows, _ := v.([]any)
+			out := []any{}
+			for _, row := range rows {
+				if service, ok := row.(map[string]any); ok && service["exposure"] == "public" {
+					out = append(out, row)
+				}
+			}
+			return out
+		}}
 	return &UI{base: base, client: client, dev: dev, now: now, sessions: map[string]session{}, rates: map[string]rate{}, templates: template.Must(template.New("ui").Funcs(funcs).ParseFS(assets, "templates/*.html"))}
 }
 func random() string {
@@ -281,6 +293,14 @@ func (u *UI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	path := r.URL.Path
 	switch {
+	case path == "/map":
+		var topology domain.Topology
+		if e := client.Do(ctx, "GET", "topology", nil, &topology, 0); e != nil {
+			fail(e)
+			return
+		}
+		data["Page"], data["Title"] = "map", "Карта"
+		data["Map"] = buildMap(topology, r.URL.Query().Get("relation"))
 	case path == "/":
 		if e := get("attention?filter="+url.QueryEscape(r.URL.Query().Get("filter"))+"&sort="+url.QueryEscape(r.URL.Query().Get("sort")), "Attention"); e != nil {
 			fail(e)
@@ -308,7 +328,9 @@ func (u *UI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			requests := [][2]string{}
 			switch tab {
 			case "packages":
-				requests = append(requests, [2]string{"nodes/" + id + "/packages", "Packages"})
+				all := r.URL.Query().Get("all") == "true"
+				data["AllPackages"] = all
+				requests = append(requests, [2]string{"nodes/" + id + "/packages?upgradable=" + strconv.FormatBool(!all), "Packages"})
 			case "records":
 				requests = append(requests, [2]string{"documents?node=" + id, "Documents"}, [2]string{"events?node=" + id, "Events"})
 			default:

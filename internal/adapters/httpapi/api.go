@@ -140,6 +140,8 @@ func (a *API) serve(w http.ResponseWriter, r *http.Request) {
 		return true
 	}
 	switch {
+	case path == "topology" && read:
+		out, e = a.s.Topology(ctx, p)
 	case path == "settings" && read:
 		out, e = a.s.Settings(ctx, p)
 	case path == "me" && read:

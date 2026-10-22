@@ -1,0 +1,14 @@
+{{define "services"}}{{$n:=.Node}}
+<h2>Основные и внешние сервисы</h2><p class="muted">Сервисы, доступные извне, выделены в списке узлов, на карте и в контексте для LLM. Основных сервисов может быть несколько.</p>
+{{range $index,$service := $n.services}}<article class="service-card"><strong>{{.name}}</strong> {{if eq .exposure "public"}}<span class="badge">Доступен извне</span>{{else if eq .exposure "private"}}<span class="badge quiet-badge">Внутренний</span>{{else}}<span class="badge quiet-badge">Доступность не указана</span>{{end}}{{if .primary}} <span class="badge quiet-badge">Основной</span>{{end}}
+<p>{{.purpose}}</p>{{if .url}}<a href="{{.url}}" rel="noreferrer">{{.url}}</a>{{end}}{{if .instructions}}<pre>{{.instructions}}</pre>{{end}}
+{{if eq $.Role "admin"}}<details><summary>Изменить сервис</summary><form method="post" action="/services/save">
+<input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="id" value="{{$n.id}}"><input type="hidden" name="revision" value="{{$n.revision}}"><input type="hidden" name="index" value="{{$index}}">
+<label>Название<input name="name" required value="{{.name}}"></label><label>Внешний URL<input name="url" type="url" value="{{.url}}"></label><label>Назначение<input name="purpose" value="{{.purpose}}"></label>
+<label>Доступность<select name="exposure"><option value="unknown">Неизвестна</option><option value="private" {{if eq .exposure "private"}}selected{{end}}>Внутренняя</option><option value="public" {{if eq .exposure "public"}}selected{{end}}>Доступен извне</option></select></label>
+<label class="inline"><input type="checkbox" name="primary" {{if .primary}}checked{{end}}>Основной сервис хоста</label><label>Описание доступа<textarea name="instructions">{{.instructions}}</textarea></label><button>Сохранить сервис</button> <button class="quiet" formaction="/services/delete" formnovalidate>Удалить сервис</button></form></details>{{end}}</article>
+{{else}}<p class="muted">Сервисы пока не описаны. Их отсутствие в инвентаре не подтверждает отсутствие внешнего доступа.</p>{{end}}
+{{if eq .Role "admin"}}<details><summary>Добавить сервис</summary><form method="post" action="/services/save"><input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="id" value="{{$n.id}}"><input type="hidden" name="revision" value="{{$n.revision}}">
+<label>Название<input name="name" required></label><label>Внешний URL<input name="url" type="url"></label><label>Назначение<input name="purpose"></label><label>Доступность<select name="exposure"><option value="public">Доступен извне</option><option value="private">Внутренняя</option><option value="unknown">Неизвестна</option></select></label>
+<label class="inline"><input type="checkbox" name="primary" checked>Основной сервис хоста</label><label>Описание доступа<textarea name="instructions"></textarea></label><button>Добавить</button></form></details>{{end}}
+{{end}}

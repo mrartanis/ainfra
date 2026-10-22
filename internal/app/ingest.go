@@ -229,7 +229,7 @@ func (s *Service) SaveNode(ctx context.Context, p domain.Principal, n domain.Nod
 		if n.Criticality == "" {
 			n.Criticality = "normal"
 		}
-		if !contains([]string{"physical", "vm", "router", "other"}, n.Kind) || !contains([]string{"active", "retired"}, n.Lifecycle) || !contains([]string{"low", "normal", "high"}, n.Criticality) {
+		if !contains([]string{"physical", "vm", "container", "router", "other"}, n.Kind) || !contains([]string{"active", "retired"}, n.Lifecycle) || !contains([]string{"low", "normal", "high"}, n.Criticality) {
 			return ErrInvalid
 		}
 		if e := putNode(tx, n); e != nil {
